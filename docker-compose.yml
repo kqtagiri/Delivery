@@ -1,0 +1,33 @@
+services:
+  app:
+    build: .
+    container_name: app
+    environment:
+      CONN_STRING: ${CONN_STRING}
+      DB_HOST: database
+    depends_on:
+      database:
+        condition: service_healthy
+    restart: on-failure
+    ports:
+      - "9111:9111"
+
+  database:
+    image: postgres:18-bookworm
+    container_name: db
+    environment:
+      POSTGRES_PASSWORD: ${DB_PASS}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_DB: ${DB_NAME}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql 
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pgdata:
