@@ -4,6 +4,7 @@ import (
 	"context"
 	"delivery/internal/domain"
 	"delivery/internal/service"
+	"errors"
 	"log/slog"
 	"strconv"
 	"time"
@@ -75,13 +76,19 @@ func (h *OrderHandler) CreateOrder(c *gin.Context) {
 	dto := OrderDTO{}
 	if err := c.ShouldBindJSON(&dto); err != nil {
 		slog.Error(err.Error())
-		c.JSON(400, gin.H{"error": err})
+		c.JSON(500, gin.H{"error": err})
 		return
 	}
 
-	err, order := h.Service.CreateOrder(&ctx, dto.Email, dto.Address)
+	order, err := h.Service.CreateOrder(ctx, dto.Email, dto.Address)
 	if err != nil {
-		c.JSON(500, gin.H{"error": err})
+		if errors.Is(err, domain.ErrInvalidAddress) || errors.Is(err, domain.ErrInvalidEmail) || errors.Is(err, domain.ErrWithInsert) {
+			c.JSON(400, gin.H{"error": err})
+		} else if errors.Is(err, domain.ErrOrderNotFound) {
+			c.JSON(404, gin.H{"error": err})
+		} else {
+			c.JSON(500, gin.H{"error": err})
+		}
 		return
 	}
 
@@ -120,8 +127,14 @@ func (h *OrderHandler) AddItemsToOrder(c *gin.Context) {
 
 	for _, dto := range itemsDTO {
 
-		if err := h.Service.AddItemsToOrder(&ctx, number, dto.Title, dto.RestTitle); err != nil {
-			c.JSON(500, gin.H{"error": err})
+		if err := h.Service.AddItemsToOrder(ctx, number, dto.Title, dto.RestTitle); err != nil {
+			if errors.Is(err, domain.ErrWithInsert) || errors.Is(err, domain.ErrWithUpdate) {
+				c.JSON(400, gin.H{"error": err})
+			} else if errors.Is(err, domain.ErrItemNotFound) || errors.Is(err, domain.ErrOrderNotFound) {
+				c.JSON(404, gin.H{"error": err})
+			} else {
+				c.JSON(500, gin.H{"error": err})
+			}
 			return
 		}
 
@@ -162,8 +175,14 @@ func (h *OrderHandler) DeleteItemsFromOrder(c *gin.Context) {
 
 	for _, dto := range itemsDTO {
 
-		if err := h.Service.DeleteItemsFromOrder(&ctx, number, dto.Title, dto.RestTitle); err != nil {
-			c.JSON(400, gin.H{"error": err})
+		if err := h.Service.DeleteItemsFromOrder(ctx, number, dto.Title, dto.RestTitle); err != nil {
+			if errors.Is(err, domain.ErrWithUpdate) || errors.Is(err, domain.ErrWithDelete) {
+				c.JSON(400, gin.H{"error": err})
+			} else if errors.Is(err, domain.ErrItemNotFound) || errors.Is(err, domain.ErrOrderNotFound) {
+				c.JSON(404, gin.H{"error": err})
+			} else {
+				c.JSON(500, gin.H{"error": err})
+			}
 			return
 		}
 
@@ -178,14 +197,14 @@ func (h *OrderHandler) DeleteItemsFromOrder(c *gin.Context) {
 
 }
 
-func (h *OrderHandler) DeleteOrder(c *gin.Context) {
+func (h *OrderHandler) CancelOrder(c *gin.Context) {
 
-	slog.Info("Handler started \"DeleteOrder\"")
+	slog.Info("Handler started \"CancelOrder\"")
 
 	number_string := c.Param("number")
 	number, err := strconv.Atoi(number_string)
 	if err != nil || number <= 0 {
-		slog.Error("Haandler \"DeleteOrder\"Get invalid number")
+		slog.Error("Haandler \"CancelOrder\"Get invalid number")
 		c.JSON(400, gin.H{"error": "Get invalid number"})
 		return
 	}
@@ -195,29 +214,33 @@ func (h *OrderHandler) DeleteOrder(c *gin.Context) {
 	defer cancel()
 	start := time.Now()
 
-	if err := h.Service.DeleteOrder(&ctx, number); err != nil {
-		c.JSON(500, gin.H{"error": err})
+	if err := h.Service.CancelOrder(ctx, number); err != nil {
+		if errors.Is(err, domain.ErrWithUpdate) {
+			c.JSON(400, gin.H{"error": err})
+		} else {
+			c.JSON(500, gin.H{"error": err})
+		}
 		return
 	}
 
 	if time.Since(start) > 4*time.Second {
-		slog.Warn("\"DeleteOrder\" took a lot of time")
+		slog.Warn("\"CancelOrder\" took a lot of time")
 	}
 
-	slog.Info("Handler ended \"DeleteOrder\" success")
+	slog.Info("Handler ended \"CancelOrder\" success")
 	c.Status(200)
 
 }
 
-func (h *OrderHandler) OrderInfo(c *gin.Context) {
+func (h *OrderHandler) GetOrder(c *gin.Context) {
 
-	slog.Info("Handler started \"OrderInfo\"")
+	slog.Info("Handler started \"GetOrder\"")
 
 	number_string := c.Param("number")
 	number, err := strconv.Atoi(number_string)
 	if err != nil {
-		slog.Error("Handler \"OrderInfo\" Get next error when convert number:%w", err)
-		c.JSON(400, gin.H{"error": "Get invalid number"})
+		slog.Error("Handler \"GetOrder\" get next error when convert number:%w", err)
+		c.JSON(400, gin.H{"error": domain.ErrInvalidNumber})
 		return
 	}
 
@@ -226,32 +249,36 @@ func (h *OrderHandler) OrderInfo(c *gin.Context) {
 	defer cancel()
 	start := time.Now()
 
-	err, order := h.Service.OrderInfo(&ctx, number)
+	order, err := h.Service.GetOrder(ctx, number)
 	if err != nil {
-		c.JSON(500, gin.H{"error": err})
+		if errors.Is(err, domain.ErrOrderNotFound) {
+			c.JSON(404, gin.H{"error": err})
+		} else {
+			c.JSON(500, gin.H{"error": err})
+		}
 		return
 	}
 
 	dto := ConvertOrderToDTO(order)
 
 	if time.Since(start) > 4*time.Second {
-		slog.Warn("\"OrderInfo\" took a lot of time")
+		slog.Warn("\"GetOrder\" took a lot of time")
 	}
 
-	slog.Info("Handler ended \"OrderInfo\" success")
+	slog.Info("Handler ended \"GetOrder\" success")
 	c.JSON(200, dto)
 
 }
 
-func (h *OrderHandler) OrderDetailInfo(c *gin.Context) {
+func (h *OrderHandler) GetOrderDetails(c *gin.Context) {
 
-	slog.Info("Handler started \"OrderDetailInfo\"")
+	slog.Info("Handler started \"GetOrderDetails\"")
 
 	number_string := c.Param("number")
 	number, err := strconv.Atoi(number_string)
 	if err != nil {
-		slog.Error("Handler \"OrderDetailInfo\" Get next error when convert number:%w", err)
-		c.JSON(400, gin.H{"error": "Get invalid number"})
+		slog.Error("Handler \"GetOrderDetails\" Get next error when convert number:%w", err)
+		c.JSON(400, gin.H{"error": domain.ErrInvalidNumber})
 		return
 	}
 
@@ -260,7 +287,7 @@ func (h *OrderHandler) OrderDetailInfo(c *gin.Context) {
 	defer cancel()
 	start := time.Now()
 
-	err, items := h.Service.OrderDetailInfo(&ctx, number)
+	items, err := h.Service.GetOrderDetails(ctx, number)
 	if err != nil {
 		c.JSON(500, gin.H{"error": err})
 		return
@@ -274,10 +301,10 @@ func (h *OrderHandler) OrderDetailInfo(c *gin.Context) {
 	}
 
 	if time.Since(start) > 4*time.Second {
-		slog.Warn("\"OrderDetailInfo\" took a lot of time")
+		slog.Warn("\"GetOrderDetails\" took a lot of time")
 	}
 
-	slog.Info("Handler ended \"OrderDetailInfo\" success")
+	slog.Info("Handler ended \"GetOrderDetails\" success")
 	c.JSON(200, dtos)
 
 }
@@ -305,8 +332,14 @@ func (h *OrderHandler) ConfirmOrder(c *gin.Context) {
 	defer cancel()
 	start := time.Now()
 
-	if err := h.Service.ConfirmOrder(&ctx, number, email); err != nil {
-		c.JSON(500, gin.H{"error": err})
+	if err := h.Service.ConfirmOrder(ctx, number, email); err != nil {
+		if errors.Is(err, domain.ErrWithUpdate) || errors.Is(err, domain.ErrStatusNotCreated) {
+			c.JSON(400, gin.H{"error": err})
+		} else if errors.Is(err, domain.ErrOrderNotFound) || errors.Is(err, domain.ErrUserNotFound) {
+			c.JSON(404, gin.H{"error": err})
+		} else {
+			c.JSON(500, gin.H{"error": err})
+		}
 		return
 	}
 

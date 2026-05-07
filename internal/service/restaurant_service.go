@@ -19,58 +19,58 @@ func NewRestaurantService(repo repository.RestaurantRepository) *RestaurantServi
 
 }
 
-func (s *RestaurantService) CreateRestaurant(ctx *context.Context, title, desc, addr string, rating float64) (error, *domain.Restaurant) {
+func (s *RestaurantService) CreateRestaurant(ctx context.Context, title, desc, addr string, rating float64) (*domain.Restaurant, error) {
 
 	slog.Info("Service started \"CreateRestaurant\"")
 
-	err, rest := domain.NewRestaurant(title, desc, addr, rating)
+	rest, err := domain.NewRestaurant(title, desc, addr, rating)
 	if err != nil {
 		slog.Info("Service \"CreateRestaurant\" get next error:%w", err)
-		return err, nil
+		return nil, err
 	}
 
 	if err := s.Repo.CreateRestaurant(ctx, rest); err != nil {
-		return err, nil
+		return nil, err
 	}
 
 	slog.Info("Service ended \"CreateRestaurant\" success")
-	return nil, rest
+	return rest, nil
 
 }
 
-func (s *RestaurantService) RestaurantsList(ctx *context.Context) (error, *[]domain.Restaurant) {
+func (s *RestaurantService) RestaurantsList(ctx context.Context) (*[]domain.Restaurant, error) {
 
 	slog.Info("Service started \"RestaurantsList\"")
 
-	err, rests := s.Repo.RestaurantsList(ctx)
+	rests, err := s.Repo.RestaurantsList(ctx)
 	if err != nil {
-		return err, nil
+		return nil, err
 	}
 
 	slog.Info("Service ended \"RestaurantsList\" success")
-	return nil, rests
+	return rests, nil
 
 }
 
-func (s *RestaurantService) RestaurantMenu(ctx *context.Context, title string) (error, *[]domain.Item) {
+func (s *RestaurantService) RestaurantMenu(ctx context.Context, title string) (*[]domain.Item, error) {
 
 	slog.Info("Service started \"RestaurantMenu\" from %s", title)
 
-	err, items := s.Repo.RestaurantMenu(ctx, title)
+	items, err := s.Repo.RestaurantMenu(ctx, title)
 	if err != nil {
-		return err, nil
+		return nil, err
 	}
 
 	slog.Info("Service ended \"RestaurantMenu\" from %s success", title)
-	return nil, items
+	return items, nil
 
 }
 
-func (s *RestaurantService) AddNewItems(ctx *context.Context, title, restTitle, composition string, time int, cost float64) error {
+func (s *RestaurantService) AddNewItems(ctx context.Context, title, restTitle, composition string, time int, cost float64) error {
 
 	slog.Info("Service started \"AddNewItems\"")
 
-	err, item := domain.NewItem(title, composition, restTitle, time, cost)
+	item, err := domain.NewItem(title, composition, restTitle, time, cost)
 	if err != nil {
 		slog.Info("Service \"AddNewItems\" get next error when create a new item:%w", err)
 		return err
@@ -85,7 +85,7 @@ func (s *RestaurantService) AddNewItems(ctx *context.Context, title, restTitle, 
 
 }
 
-func (s *RestaurantService) DeleteItems(ctx *context.Context, title, restTitle string) error {
+func (s *RestaurantService) DeleteItems(ctx context.Context, title, restTitle string) error {
 
 	slog.Info("Service started \"DeleteItems\"")
 

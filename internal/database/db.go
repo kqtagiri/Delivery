@@ -12,16 +12,17 @@ type DB struct {
 	Ctx  context.Context
 }
 
-func NewDB(ctx *context.Context) (error, *DB) {
+func NewDB(ctx context.Context) (*DB, error) {
 
 	Conn_string := os.Getenv("CONN_STRING")
-	Conn, err := pgx.Connect(*ctx, Conn_string)
+	Conn, err := pgx.Connect(ctx, Conn_string)
 	if err != nil {
-		return err, nil
+		return nil, err
 	}
-	return nil, &DB{
+
+	return &DB{
 		Conn: Conn,
-		Ctx:  *ctx,
-	}
+		Ctx:  ctx,
+	}, nil
 
 }

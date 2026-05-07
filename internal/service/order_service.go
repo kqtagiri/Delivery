@@ -20,26 +20,26 @@ func NewOrderService(repo repository.OrderRepository) *OrderService {
 
 }
 
-func (s *OrderService) CreateOrder(ctx *context.Context, email, address string) (error, *domain.Order) {
+func (s *OrderService) CreateOrder(ctx context.Context, email, address string) (*domain.Order, error) {
 
 	slog.Info("Service started \"CreateOrder\"")
 
-	err, order := domain.NewOrder(email, address)
+	order, err := domain.NewOrder(email, address)
 	if err != nil {
 		slog.Error("Service \"CreateOrder\" get next error:%w", err)
-		return err, nil
+		return nil, err
 	}
 
 	if err := s.Repo.CreateOrder(ctx, order); err != nil {
-		return err, nil
+		return nil, err
 	}
 
 	slog.Info("Service ended \"CreateOrder\" success")
-	return nil, order
+	return order, nil
 
 }
 
-func (s *OrderService) AddItemsToOrder(ctx *context.Context, number int, title, restTitle string) error {
+func (s *OrderService) AddItemsToOrder(ctx context.Context, number int, title, restTitle string) error {
 
 	slog.Info("Service started \"AddItemsToOrder\"")
 
@@ -52,7 +52,7 @@ func (s *OrderService) AddItemsToOrder(ctx *context.Context, number int, title, 
 
 }
 
-func (s *OrderService) DeleteItemsFromOrder(ctx *context.Context, number int, title, restTitle string) error {
+func (s *OrderService) DeleteItemsFromOrder(ctx context.Context, number int, title, restTitle string) error {
 
 	slog.Info("Service started \"DeleteItemsFromOrder\"")
 
@@ -65,57 +65,57 @@ func (s *OrderService) DeleteItemsFromOrder(ctx *context.Context, number int, ti
 
 }
 
-func (s *OrderService) DeleteOrder(ctx *context.Context, number int) error {
+func (s *OrderService) CancelOrder(ctx context.Context, number int) error {
 
-	slog.Info("Service started \"DeleteOrder\"")
+	slog.Info("Service started \"CancelOrder\"")
 
-	if err := s.Repo.DeleteOrder(ctx, number); err != nil {
+	if err := s.Repo.CancelOrder(ctx, number); err != nil {
 		return err
 	}
 
-	slog.Info("Service ended \"DeleteOrder\" success")
+	slog.Info("Service ended \"CancelOrder\" success")
 	return nil
 
 }
 
-func (s *OrderService) OrderInfo(ctx *context.Context, number int) (error, *domain.Order) {
+func (s *OrderService) GetOrder(ctx context.Context, number int) (*domain.Order, error) {
 
-	slog.Info("Service started \"OrderInfo\"")
+	slog.Info("Service started \"GetOrder\"")
 
-	err, order := s.Repo.OrderInfo(ctx, number)
+	order, err := s.Repo.GetOrder(ctx, number)
 	if err != nil {
-		return err, nil
+		return nil, err
 	}
 
-	slog.Info("Service ended \"OrderInfo\" success")
-	return nil, order
+	slog.Info("Service ended \"GetOrder\" success")
+	return order, nil
 
 }
 
-func (s *OrderService) OrderDetailInfo(ctx *context.Context, number int) (error, *[]domain.Item) {
+func (s *OrderService) GetOrderDetails(ctx context.Context, number int) (*[]domain.Item, error) {
 
-	slog.Info("Service started \"OrderDetailInfo\"")
+	slog.Info("Service started \"GetOrderDetails\"")
 
-	err, items := s.Repo.OrderDetailInfo(ctx, number)
+	items, err := s.Repo.GetOrderDetails(ctx, number)
 	if err != nil {
-		return err, nil
+		return nil, err
 	}
 
-	slog.Info("Service ended \"OrderDetailInfo\" success")
-	return nil, items
+	slog.Info("Service ended \"GetOrderDetails\" success")
+	return items, nil
 
 }
 
-func (s *OrderService) ConfirmOrder(ctx *context.Context, number int, email string) error {
+func (s *OrderService) ConfirmOrder(ctx context.Context, number int, email string) error {
 
 	slog.Info("Service started \"ConfirmOrder\"")
 
-	err, user := s.Repo.FillUser(ctx, email)
+	user, err := s.Repo.FillUser(ctx, email)
 	if err != nil {
 		return err
 	}
 
-	err, order := s.Repo.OrderInfo(ctx, number)
+	order, err := s.Repo.GetOrder(ctx, number)
 	if err != nil {
 		return err
 	}

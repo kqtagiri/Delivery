@@ -61,9 +61,9 @@ func (h *UserHandler) RegisterAccount(c *gin.Context) {
 		return
 	}
 
-	err, user := h.Service.RegisterAccount(&ctx, req.Name, req.Email, req.Address)
+	user, err := h.Service.RegisterAccount(ctx, req.Name, req.Email, req.Address)
 	if err != nil {
-		if errors.Is(err, domain.ErrInvalidName) || errors.Is(err, domain.ErrInvalidEmail) || errors.Is(err, domain.ErrInvalidAddress) {
+		if errors.Is(err, domain.ErrInvalidName) || errors.Is(err, domain.ErrInvalidEmail) || errors.Is(err, domain.ErrInvalidAddress) || errors.Is(err, domain.ErrWithInsert) {
 			c.JSON(400, gin.H{"error": err})
 			return
 		}
@@ -99,9 +99,15 @@ func (h *UserHandler) ReplenishBalance(c *gin.Context) {
 		return
 	}
 
-	err, user := h.Service.ReplenishBalance(&ctx, req.Balance, email)
+	user, err := h.Service.ReplenishBalance(ctx, req.Balance, email)
 	if err != nil {
-		c.JSON(500, gin.H{"error": err})
+		if errors.Is(err, domain.ErrInvalidReplenish) || errors.Is(err, domain.ErrWithUpdate) {
+			c.JSON(400, gin.H{"error": err})
+		} else if errors.Is(err, domain.ErrUserNotFound) {
+			c.JSON(404, gin.H{"error": err})
+		} else {
+			c.JSON(500, gin.H{"error": err})
+		}
 		return
 	}
 
@@ -126,9 +132,14 @@ func (h *UserHandler) UserInfo(c *gin.Context) {
 	start := time.Now()
 
 	email := c.Param("email")
-	err, user := h.Service.UserInfo(&ctx, email)
+	user, err := h.Service.UserInfo(ctx, email)
 	if err != nil {
-		c.JSON(500, gin.H{"error": err})
+		if errors.Is(err, domain.ErrUserNotFound) {
+			c.JSON(404, gin.H{"error": err})
+		} else {
+			c.JSON(500, gin.H{"error": err})
+		}
+		return
 	}
 
 	if time.Since(start) > 4*time.Second {
@@ -151,7 +162,7 @@ func (h *UserHandler) AllUsersInfo(c *gin.Context) {
 	defer cancel()
 	start := time.Now()
 
-	err, users := h.Service.AllUsersInfo(&ctx)
+	users, err := h.Service.AllUsersInfo(ctx)
 	if err != nil {
 		c.JSON(500, gin.H{"error": err})
 		return

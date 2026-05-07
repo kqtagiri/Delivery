@@ -1,14 +1,5 @@
 package domain
 
-import "errors"
-
-var (
-	ErrInvalidNumber = errors.New("Invalid number")
-	ErrInvalidTime   = errors.New("Invalid time")
-	ErrInvalidCost   = errors.New("Invalid cost")
-	number           = 1
-)
-
 type Order struct {
 	Number  int
 	Email   string
@@ -19,24 +10,24 @@ type Order struct {
 	Check   map[Item]int //restaurant_title: item1: kolvo; item2: kolvo...
 }
 
-func NewOrder(email, address string) (error, *Order) {
+func NewOrder(email, address string) (*Order, error) {
 
 	if email == "" {
-		return ErrInvalidEmail, nil
+		return nil, ErrInvalidEmail
 	}
 
 	if address == "" {
-		return ErrInvalidAddress, nil
+		return nil, ErrInvalidAddress
 	}
 
-	return nil, &Order{
-		Number:  number,
+	return &Order{
+		Number:  0,
 		Email:   email,
 		Address: address,
-		Status:  "Created",
+		Status:  StatusCreated,
 		Time:    0,
 		Cost:    0,
 		Check:   make(map[Item]int),
-	}
+	}, nil
 
 }

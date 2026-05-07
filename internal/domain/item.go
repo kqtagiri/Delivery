@@ -1,12 +1,5 @@
 package domain
 
-import "errors"
-
-var (
-	ErrInvalidRestaurantTitle = errors.New("Invalid restaurant title")
-	ErrInvalidComposition     = errors.New("Invalid composition")
-)
-
 type Item struct {
 	Title       string
 	RestTitle   string
@@ -15,29 +8,29 @@ type Item struct {
 	Cost        float64
 }
 
-func NewItem(title, composition, r_title string, time int, cost float64) (error, *Item) {
+func NewItem(title, composition, r_title string, time int, cost float64) (*Item, error) {
 
 	if title == "" {
-		return ErrInvalidTitle, nil
+		return nil, ErrInvalidTitle
 	}
 	if composition == "" {
-		return ErrInvalidComposition, nil
+		return nil, ErrInvalidComposition
 	}
 	if cost < 0 {
-		return ErrInvalidCost, nil
+		return nil, ErrInvalidCost
 	}
 	if time < 0 {
-		return ErrInvalidTime, nil
+		return nil, ErrInvalidTime
 	}
 	if r_title == "" {
-		return ErrInvalidRestaurantTitle, nil
+		return nil, ErrInvalidRestaurantTitle
 	}
-	return nil, &Item{
+	return &Item{
 		Title:       title,
 		RestTitle:   r_title,
 		Composition: composition,
 		Time:        time,
 		Cost:        cost,
-	}
+	}, nil
 
 }

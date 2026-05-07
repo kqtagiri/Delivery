@@ -1,14 +1,7 @@
 package domain
 
-import "errors"
-
-var (
-	ErrInvalidEmail     = errors.New("Invalid email")
-	ErrInvalidName      = errors.New("Invalid name")
-	ErrInvalidAddress   = errors.New("Invalid address")
-	ErrInvalidReplenish = errors.New("Invalid replenish")
-	ErrInvalidPrice     = errors.New("Invalid price")
-	ErrInvlaidPay       = errors.New("Invalid pay")
+import (
+	"net/mail"
 )
 
 type User struct {
@@ -19,26 +12,26 @@ type User struct {
 	//Phone_Number(in future)
 }
 
-func NewUser(name, email, address string) (error, *User) {
+func NewUser(name, email, address string) (*User, error) {
 
-	if email == "" {
-		return ErrInvalidEmail, nil
+	if _, err := mail.ParseAddress(email); err != nil {
+		return nil, ErrInvalidEmail
 	}
 
 	if name == "" {
-		return ErrInvalidName, nil
+		return nil, ErrInvalidName
 	}
 
 	if address == "" {
-		return ErrInvalidAddress, nil
+		return nil, ErrInvalidAddress
 	}
 
-	return nil, &User{
+	return &User{
 		Name:    name,
 		Email:   email,
 		Address: address,
 		Balance: 0,
-	}
+	}, nil
 
 }
 

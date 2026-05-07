@@ -14,11 +14,11 @@ var (
 )
 
 type RestaurantRepository interface {
-	CreateRestaurant(ctx *context.Context, rest *domain.Restaurant) error
-	RestaurantsList(ctx *context.Context) (error, *[]domain.Restaurant)
-	RestaurantMenu(ctx *context.Context, title string) (error, *[]domain.Item)
-	AddNewItems(ctx *context.Context, item *domain.Item) error
-	DeleteItems(ctx *context.Context, title, restTitle string) error
+	CreateRestaurant(ctx context.Context, rest *domain.Restaurant) error
+	RestaurantsList(ctx context.Context) (*[]domain.Restaurant, error)
+	RestaurantMenu(ctx context.Context, title string) (*[]domain.Item, error)
+	AddNewItems(ctx context.Context, item *domain.Item) error
+	DeleteItems(ctx context.Context, title, restTitle string) error
 }
 
 type RestaurantRepositoryStruct struct {
@@ -119,17 +119,24 @@ func (r *RestaurantRepositoryStruct) CreateMenuTable() error {
 
 }
 
-func (r *RestaurantRepositoryStruct) CreateRestaurant(ctx *context.Context, rest *domain.Restaurant) error {
+func (r *RestaurantRepositoryStruct) CreateRestaurant(ctx context.Context, rest *domain.Restaurant) error {
 
 	slog.Info("Repository started \"CreateRestaurant\"")
 
-	r.Mtx.RLock()
-	defer r.Mtx.RUnlock()
+	r.Mtx.Lock()
+	defer r.Mtx.Unlock()
 
 	query := `INSERT INTO restaurants (title, description, address, rating) VALUES($1,$2,$3,$4);`
-	if _, err := r.DB.Conn.Exec(r.DB.Ctx, query, rest.Title, rest.Description, rest.Address, rest.Rating); err != nil {
+	result, err := r.DB.Conn.Exec(r.DB.Ctx, query, rest.Title, rest.Description, rest.Address, rest.Rating)
+	if err != nil {
 		slog.Error("Repository \"CreateRestaurant\" get next error:%w", err)
 		return err
+	}
+
+	affected := result.RowsAffected()
+	if affected != 1 {
+		slog.Error("Repository \"CreateRestaurant\" get next error:%w", domain.ErrWithInsert)
+		return domain.ErrWithInsert
 	}
 
 	slog.Info("Repository ended \"CreateRestaurant\" success")
@@ -137,7 +144,7 @@ func (r *RestaurantRepositoryStruct) CreateRestaurant(ctx *context.Context, rest
 
 }
 
-func (r *RestaurantRepositoryStruct) RestaurantsList(ctx *context.Context) (error, *[]domain.Restaurant) {
+func (r *RestaurantRepositoryStruct) RestaurantsList(ctx context.Context) (*[]domain.Restaurant, error) {
 
 	slog.Info("Repository started \"RestaurantsList\"")
 
@@ -148,11 +155,11 @@ func (r *RestaurantRepositoryStruct) RestaurantsList(ctx *context.Context) (erro
 	rows, err := r.DB.Conn.Query(r.DB.Ctx, query)
 	if err != nil {
 		slog.Error("Repository \"RestaurantsList\" get next error:%w", err)
-		return err, nil
+		return nil, err
 	}
+	defer rows.Close()
 
 	rests := []domain.Restaurant{}
-
 	for rows.Next() {
 
 		var model RestModel
@@ -161,12 +168,17 @@ func (r *RestaurantRepositoryStruct) RestaurantsList(ctx *context.Context) (erro
 
 	}
 
+	if err := rows.Err(); err != nil {
+		slog.Error("Repository \"RestaurantsList\" get next error:%w", err)
+		return nil, err
+	}
+
 	slog.Info("Repository ended \"RestaurantsList\" success")
-	return nil, &rests
+	return &rests, nil
 
 }
 
-func (r *RestaurantRepositoryStruct) RestaurantMenu(ctx *context.Context, title string) (error, *[]domain.Item) {
+func (r *RestaurantRepositoryStruct) RestaurantMenu(ctx context.Context, title string) (*[]domain.Item, error) {
 
 	slog.Info("Repository started \"RestaurantMenu\" from %s", title)
 
@@ -177,8 +189,9 @@ func (r *RestaurantRepositoryStruct) RestaurantMenu(ctx *context.Context, title 
 	rows, err := r.DB.Conn.Query(r.DB.Ctx, query, title)
 	if err != nil {
 		slog.Error("Repository \"RestaurantMenu\" from %s get next error:%w", title, err)
-		return err, nil
+		return nil, err
 	}
+	defer rows.Close()
 
 	var model ItemModel
 	items := []domain.Item{}
@@ -189,22 +202,34 @@ func (r *RestaurantRepositoryStruct) RestaurantMenu(ctx *context.Context, title 
 
 	}
 
+	if err := rows.Err(); err != nil {
+		slog.Error("Repository \"RestaurantsMenu\" get next error:%w", err)
+		return nil, err
+	}
+
 	slog.Info("Repository ended \"RestaurantMenu\" from %s success", title)
-	return nil, &items
+	return &items, nil
 
 }
 
-func (r *RestaurantRepositoryStruct) AddNewItems(ctx *context.Context, item *domain.Item) error {
+func (r *RestaurantRepositoryStruct) AddNewItems(ctx context.Context, item *domain.Item) error {
 
 	slog.Info("Repository started \"AddNewItems\"")
 
-	r.Mtx.RLock()
-	defer r.Mtx.RUnlock()
+	r.Mtx.Lock()
+	defer r.Mtx.Unlock()
 
 	query := `INSERT INTO menu(title, rest_title, composition, time, cost) VALUES($1,$2,$3,$4,$5);`
-	if _, err := r.DB.Conn.Exec(r.DB.Ctx, query, item.Title, item.RestTitle, item.Composition, item.Time, item.Cost); err != nil {
+	result, err := r.DB.Conn.Exec(r.DB.Ctx, query, item.Title, item.RestTitle, item.Composition, item.Time, item.Cost)
+	if err != nil {
 		slog.Error("Repository \"AddNewItems\" get next error:%w", err)
 		return err
+	}
+
+	affected := result.RowsAffected()
+	if affected != 1 {
+		slog.Error("Repository \"AddNewItems\" get next error:%w", domain.ErrWithInsert)
+		return domain.ErrWithInsert
 	}
 
 	slog.Info("Repository ended \"AddNewItems\" success")
@@ -212,17 +237,24 @@ func (r *RestaurantRepositoryStruct) AddNewItems(ctx *context.Context, item *dom
 
 }
 
-func (r *RestaurantRepositoryStruct) DeleteItems(ctx *context.Context, title, restTitle string) error {
+func (r *RestaurantRepositoryStruct) DeleteItems(ctx context.Context, title, restTitle string) error {
 
 	slog.Info("Repository started \"DeleteItems\"")
 
-	r.Mtx.RLock()
-	defer r.Mtx.RUnlock()
+	r.Mtx.Lock()
+	defer r.Mtx.Unlock()
 
 	query := `DELETE FROM menu WHERE title = $1 AND rest_title = $2;`
-	if _, err := r.DB.Conn.Exec(r.DB.Ctx, query, title, restTitle); err != nil {
+	result, err := r.DB.Conn.Exec(r.DB.Ctx, query, title, restTitle)
+	if err != nil {
 		slog.Error("Repository \"DeleteItems\" get next error:%w", err)
 		return err
+	}
+
+	affected := result.RowsAffected()
+	if affected == 0 {
+		slog.Error("Repository \"DeleteItems\" get next error:%w", domain.ErrWithDelete)
+		return domain.ErrWithDelete
 	}
 
 	slog.Info("Repository ended \"DeleteItems\" success")

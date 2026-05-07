@@ -19,49 +19,49 @@ func NewUserService(repo repository.UserRepository) *UserService {
 
 }
 
-func (s *UserService) RegisterAccount(ctx *context.Context, name, email, address string) (error, *domain.User) {
+func (s *UserService) RegisterAccount(ctx context.Context, name, email, address string) (*domain.User, error) {
 
 	slog.Info("Service started \"RegisterAccount\"")
 
-	err, user := domain.NewUser(name, email, address)
+	user, err := domain.NewUser(name, email, address)
 	if err != nil {
 		slog.Error("Service \"RegisterAccount\" get next err:%w", err)
-		return err, nil
+		return nil, err
 	}
 
 	if err := s.Repo.RegisterAccount(ctx, user); err != nil {
-		return err, nil
+		return nil, err
 	}
 
 	slog.Info("Service ended \"RegisterAccount\" success")
-	return nil, user
+	return user, nil
 
 }
 
-func (s *UserService) ReplenishBalance(ctx *context.Context, balance float64, email string) (error, *domain.User) {
+func (s *UserService) ReplenishBalance(ctx context.Context, balance float64, email string) (*domain.User, error) {
 
 	slog.Info("Service started \"ReplenishBalance\"")
 
-	err, user := s.Repo.UserInfo(ctx, email)
+	user, err := s.Repo.UserInfo(ctx, email)
 	if err != nil {
-		return err, nil
+		return nil, err
 	}
 
 	if err := user.ReplenishBalance(balance); err != nil {
 		slog.Error("Service \"ReplenishBalance\" with email %s get next err:%w", email, err)
-		return err, nil
+		return nil, err
 	}
 
 	if err := s.Repo.ReplenishBalance(ctx, user.Balance, email); err != nil {
-		return err, nil
+		return nil, err
 	}
 
 	slog.Info("Service ended \"ReplenishBalance\" success")
-	return nil, user
+	return user, nil
 
 }
 
-func (s *UserService) UserInfo(ctx *context.Context, email string) (error, *domain.User) {
+func (s *UserService) UserInfo(ctx context.Context, email string) (*domain.User, error) {
 
 	slog.Info("Service started \"UserInfo\"")
 
@@ -75,17 +75,17 @@ func (s *UserService) UserInfo(ctx *context.Context, email string) (error, *doma
 
 }
 
-func (s *UserService) AllUsersInfo(ctx *context.Context) (error, *[]domain.User) {
+func (s *UserService) AllUsersInfo(ctx context.Context) (*[]domain.User, error) {
 
 	slog.Info("Service started \"AllUsersInfo\"")
 
-	err, users := s.Repo.AllUsersInfo(ctx)
+	users, err := s.Repo.AllUsersInfo(ctx)
 	if err != nil {
-		return err, nil
+		return nil, err
 	}
 
 	slog.Info("Service ended \"AllUsersInfo\" success")
-	return nil, users
+	return users, nil
 
 }
 

@@ -2,22 +2,24 @@ package repository
 
 import (
 	"context"
+	"database/sql"
 	"delivery/internal/database"
 	"delivery/internal/domain"
+	"errors"
 	"fmt"
 	"log/slog"
 	"sync"
 )
 
 type OrderRepository interface {
-	CreateOrder(ctx *context.Context, order *domain.Order) error
-	AddItemsToOrder(ctx *context.Context, number int, title, restTitle string) error
-	DeleteItemsFromOrder(ctx *context.Context, number int, title, restTitle string) error
-	DeleteOrder(ctx *context.Context, number int) error
-	OrderInfo(ctx *context.Context, number int) (error, *domain.Order)
-	OrderDetailInfo(ctx *context.Context, number int) (error, *[]domain.Item)
-	ConfirmOrder(ctx *context.Context, number int, email string, newBalance float64) error
-	FillUser(ctx *context.Context, email string) (error, *domain.User)
+	CreateOrder(ctx context.Context, order *domain.Order) error
+	AddItemsToOrder(ctx context.Context, number int, title, restTitle string) error
+	DeleteItemsFromOrder(ctx context.Context, number int, title, restTitle string) error
+	CancelOrder(ctx context.Context, number int) error
+	GetOrder(ctx context.Context, number int) (*domain.Order, error)
+	GetOrderDetails(ctx context.Context, number int) (*[]domain.Item, error)
+	ConfirmOrder(ctx context.Context, number int, email string, newBalance float64) error
+	FillUser(ctx context.Context, email string) (*domain.User, error)
 }
 
 type OrderRepositoryStruct struct {
@@ -72,13 +74,13 @@ func (r *OrderRepositoryStruct) CreateOrderTable() error {
 
 	query := `CREATE TABLE IF NOT EXISTS orders(
 		id SERIAL PRIMARY KEY,
-		number INT NOT NULL,
+		number SERIAL,
 		email VARCHAR(100) NOT NULL,
 		address VARCHAR(300) NOT NULL,
 		status VARCHAR(15) NOT NULL,
 		time INT NOT NULL,
 		cost DECIMAL(9,2) NOT NULL,
-		UNIQUE(number)  
+		UNIQUE(email)
 	);`
 
 	if _, err := r.DB.Conn.Exec(r.DB.Ctx, query); err != nil {
@@ -112,31 +114,57 @@ func (r *OrderRepositoryStruct) CreateItemsInOrdersTable() error {
 
 }
 
-func (r *OrderRepositoryStruct) CreateOrder(ctx *context.Context, order *domain.Order) error {
+func (r *OrderRepositoryStruct) CreateOrder(ctx context.Context, order *domain.Order) error {
 
 	slog.Info("Repository started \"CreateOrder\"")
 
-	r.Mtx.RLock()
-	defer r.Mtx.RUnlock()
+	r.Mtx.Lock()
+	defer r.Mtx.Unlock()
 
-	query := `INSERT INTO orders(number, email, address, status, time, cost) VALUES($1,$2,$3,$4,$5,$6);`
+	tx, err := r.DB.Conn.Begin(r.DB.Ctx)
+	if err != nil {
+		slog.Error("Repository \"CreateOrder\" get next error when create a transaction:", err)
+		return err
+	}
 
-	if _, err := r.DB.Conn.Exec(r.DB.Ctx, query, order.Number, order.Email, order.Address, order.Status, order.Time, order.Cost); err != nil {
+	query := `INSERT INTO orders(email, address, status, time, cost) VALUES($1,$2,$3,$4,$5,$6);`
+
+	result, err := tx.Exec(r.DB.Ctx, query, order.Email, order.Address, order.Status, order.Time, order.Cost)
+	if err != nil {
 		slog.Error("Repository \"CreateOrder\" get next error:%w", err)
+		tx.Rollback(r.DB.Ctx)
+		return err
+	}
+
+	affected := result.RowsAffected()
+	if affected != 1 {
+		slog.Error("Repository \"CreateOrder\" have error with insert")
+		tx.Rollback(r.DB.Ctx)
+		return domain.ErrWithInsert
+	}
+
+	query = `SELECT number FROM orders WHERE email = $1;`
+
+	if err := tx.QueryRow(r.DB.Ctx, query, order.Email).Scan(&order.Number); err != nil {
+		slog.Error("Repository \"CreateOrder\" get next error:", err)
+		tx.Rollback(r.DB.Ctx)
+		if errors.Is(err, sql.ErrNoRows) {
+			return domain.ErrOrderNotFound
+		}
 		return err
 	}
 
 	slog.Info("Repository ended \"CreateOrder\" success")
-	return nil
+	return tx.Commit(r.DB.Ctx)
 
 }
 
-func (r *OrderRepositoryStruct) AddItemsToOrder(ctx *context.Context, number int, title, restTitle string) error {
+func (r *OrderRepositoryStruct) AddItemsToOrder(ctx context.Context, number int, title, restTitle string) error {
 
 	slog.Info("Repository started \"AddItemsToOrder\"")
 
-	r.Mtx.RLock()
-	defer r.Mtx.RUnlock()
+	r.Mtx.Lock()
+	defer r.Mtx.Unlock()
 
 	tx, err := r.DB.Conn.Begin(r.DB.Ctx)
 	if err != nil {
@@ -146,13 +174,16 @@ func (r *OrderRepositoryStruct) AddItemsToOrder(ctx *context.Context, number int
 
 	query := `SELECT status FROM orders WHERE number = $1;`
 	status := ""
-	if err := r.DB.Conn.QueryRow(r.DB.Ctx, query, number).Scan(&status); err != nil {
+	if err := tx.QueryRow(r.DB.Ctx, query, number).Scan(&status); err != nil {
 		slog.Error("Repository \"AddItemsToOrder\" get next error:%w", err)
 		tx.Rollback(r.DB.Ctx)
+		if errors.Is(err, sql.ErrNoRows) {
+			return domain.ErrOrderNotFound
+		}
 		return err
 	}
 
-	if status != "Created" {
+	if status != domain.StatusCreated {
 		slog.Error("Repository \"AddItemsToOrder\" try to change order which status not created!")
 		tx.Rollback(r.DB.Ctx)
 		return fmt.Errorf("Status not created!")
@@ -160,24 +191,43 @@ func (r *OrderRepositoryStruct) AddItemsToOrder(ctx *context.Context, number int
 
 	query = `SELECT * FROM menu WHERE title = $1 AND rest_title = $2;`
 	var model ItemModel
-	if err := r.DB.Conn.QueryRow(r.DB.Ctx, query, title, restTitle).Scan(&model.Id, &model.Title, &model.RestTitle, &model.Composition, &model.Time, &model.Cost); err != nil {
+	if err := tx.QueryRow(r.DB.Ctx, query, title, restTitle).Scan(&model.Id, &model.Title, &model.RestTitle, &model.Composition, &model.Time, &model.Cost); err != nil {
 		slog.Error("Repository \"AddItemsToOrder\" get next error:%w", err)
 		tx.Rollback(r.DB.Ctx)
+		if errors.Is(err, sql.ErrNoRows) {
+			return domain.ErrItemNotFound
+		}
 		return err
 	}
 
 	query = `INSERT INTO orders_items(number, title, rest_title, cost, time) VALUES($1,$2,$3,$4,$5);`
-	if _, err := r.DB.Conn.Exec(r.DB.Ctx, query, number, model.Title, model.RestTitle, model.Cost, model.Time); err != nil {
+	result, err := tx.Exec(r.DB.Ctx, query, number, model.Title, model.RestTitle, model.Cost, model.Time)
+	if err != nil {
 		slog.Error("Repository \"AddItemsToOrder\" get next error:%w", err)
 		tx.Rollback(r.DB.Ctx)
 		return err
 	}
 
+	affected := result.RowsAffected()
+	if affected != 1 {
+		slog.Error("Repository \"AddItemsToOrder\" get error with insert")
+		tx.Rollback(r.DB.Ctx)
+		return domain.ErrWithInsert
+	}
+
 	query = `UPDATE orders SET time = time + $1 AND cost = cost + $2 WHERE number = $3;`
-	if _, err := r.DB.Conn.Exec(r.DB.Ctx, query, model.Time, model.Cost, number); err != nil {
+	result, err = tx.Exec(r.DB.Ctx, query, model.Time, model.Cost, number)
+	if err != nil {
 		slog.Error("Repository \"AddItemsToOrder\" get next error:%w", err)
 		tx.Rollback(r.DB.Ctx)
 		return err
+	}
+
+	affected = result.RowsAffected()
+	if affected == 0 {
+		slog.Error("Repository \"AddItemsToOrder\" get error with update")
+		tx.Rollback(r.DB.Ctx)
+		return domain.ErrWithUpdate
 	}
 
 	slog.Info("Repository ended \"AddItemsToOrder\" success")
@@ -185,12 +235,12 @@ func (r *OrderRepositoryStruct) AddItemsToOrder(ctx *context.Context, number int
 
 }
 
-func (r *OrderRepositoryStruct) DeleteItemsFromOrder(ctx *context.Context, number int, title, restTitle string) error {
+func (r *OrderRepositoryStruct) DeleteItemsFromOrder(ctx context.Context, number int, title, restTitle string) error {
 
 	slog.Info("Repository started \"DeleteItemsFromOrder\"")
 
-	r.Mtx.RLock()
-	defer r.Mtx.RUnlock()
+	r.Mtx.Lock()
+	defer r.Mtx.Unlock()
 
 	tx, err := r.DB.Conn.Begin(r.DB.Ctx)
 	if err != nil {
@@ -200,13 +250,16 @@ func (r *OrderRepositoryStruct) DeleteItemsFromOrder(ctx *context.Context, numbe
 
 	query := `SELECT status FROM orders WHERE number = $1;`
 	status := ""
-	if err := r.DB.Conn.QueryRow(r.DB.Ctx, query, number).Scan(&status); err != nil {
+	if err := tx.QueryRow(r.DB.Ctx, query, number).Scan(&status); err != nil {
 		slog.Error("Repository \"DeleteItemsFromOrder\" get next error:%w", err)
 		tx.Rollback(r.DB.Ctx)
+		if errors.Is(err, sql.ErrNoRows) {
+			return domain.ErrOrderNotFound
+		}
 		return err
 	}
 
-	if status != "Created" {
+	if status != domain.StatusCreated {
 		slog.Error("Repository \"DeleteItemsFromOrder\" try to change order which status not created!")
 		tx.Rollback(r.DB.Ctx)
 		return fmt.Errorf("Status not created!")
@@ -216,25 +269,44 @@ func (r *OrderRepositoryStruct) DeleteItemsFromOrder(ctx *context.Context, numbe
 
 	var time int
 	var cost float64
-	if err := r.DB.Conn.QueryRow(r.DB.Ctx, query, title, restTitle, number).Scan(&time, &cost); err != nil {
+	if err := tx.QueryRow(r.DB.Ctx, query, title, restTitle, number).Scan(&time, &cost); err != nil {
 		slog.Error("Repository \"DeleteItemsFromOrder\" get next error:%w", err)
 		tx.Rollback(r.DB.Ctx)
+		if errors.Is(err, sql.ErrNoRows) {
+			return domain.ErrItemNotFound
+		}
 		return err
 	}
 
 	query = `DELETE FROM orders_items WHERE title = $1 AND rest_title = $2 AND number = $3;`
-	if _, err := r.DB.Conn.Exec(r.DB.Ctx, query, title, restTitle, number); err != nil {
+	result, err := tx.Exec(r.DB.Ctx, query, title, restTitle, number)
+	if err != nil {
 		slog.Error("Repository \"DeleteItemsFromOrder\" get next error:%w", err)
 		tx.Rollback(r.DB.Ctx)
 		return err
 	}
 
+	affected := result.RowsAffected()
+	if affected == 0 {
+		slog.Error("Repository \"DeleteItemsFromOrder\" get error with delete")
+		tx.Rollback(r.DB.Ctx)
+		return domain.ErrWithDelete
+	}
+
 	query = `UPDATE orders SET time = time - $1 AND cost = cost - $2 WHERE number = $3;`
 
-	if _, err := r.DB.Conn.Exec(r.DB.Ctx, query, time, cost, number); err != nil {
+	result, err = tx.Exec(r.DB.Ctx, query, time, cost, number)
+	if err != nil {
 		slog.Error("Repository \"DeleteItemsFromOrder\" get next error:%w", err)
 		tx.Rollback(r.DB.Ctx)
 		return err
+	}
+
+	affected = result.RowsAffected()
+	if affected == 0 {
+		slog.Error("Repository \"DeleteItemsFromOrder\" get error with update")
+		tx.Rollback(r.DB.Ctx)
+		return domain.ErrWithUpdate
 	}
 
 	slog.Info("Repository ended \"DeleteItemsFromOrder\" success")
@@ -242,55 +314,35 @@ func (r *OrderRepositoryStruct) DeleteItemsFromOrder(ctx *context.Context, numbe
 
 }
 
-func (r *OrderRepositoryStruct) DeleteOrder(ctx *context.Context, number int) error {
+func (r *OrderRepositoryStruct) CancelOrder(ctx context.Context, number int) error {
 
-	slog.Info("Repository started \"DeleteOrder\"")
+	slog.Info("Repository started \"CancelOrder\"")
 
-	r.Mtx.RLock()
-	defer r.Mtx.RUnlock()
+	r.Mtx.Lock()
+	defer r.Mtx.Unlock()
 
-	//ПОМЕЧАЕТ ОТМЕНЕННЫМИ!
-	status := "Canceled"
+	status := domain.StatusCanceled
 	query := `UPDATE orders SET status = $1 WHERE number = $2;`
-	if _, err := r.DB.Conn.Exec(r.DB.Ctx, query, status, number); err != nil {
-		slog.Error("Repository \"DeleteOrder\" get next error:%w", err)
+	result, err := r.DB.Conn.Exec(r.DB.Ctx, query, status, number)
+	if err != nil {
+		slog.Error("Repository \"CancelOrder\" get next error:%w", err)
 		return err
 	}
 
-	//УДАЛЯЕТ, А НЕ ПОМЕЧАЕТ ОТМЕНЕННЫМИ!
-	/*tx, err := r.DB.Conn.Begin(r.DB.Ctx)
-	if err != nil {
-		slog.Error("Repository \"DeleteOrder\" get next error when create a transaction:%w", err)
-		return fmt.Errorf("get next error:%w", err)
+	affected := result.RowsAffected()
+	if affected == 0 {
+		slog.Error("Repository \"CancelOrder\" get error with update")
+		return domain.ErrWithUpdate
 	}
 
-	query := `DELETE FROM orders WHERE number = $1;`
-
-	if _, err := r.DB.Conn.Exec(r.DB.Ctx, query, number); err != nil {
-		slog.Error("Repository \"DeleteItemsFromOrder\" get next error:%w", err)
-		tx.Rollback(r.DB.Ctx)
-		return fmt.Errorf("get next error:%w", err)
-	}
-
-	query = `DELETE FROM orders_items WHERE number = $1;`
-
-	if _, err := r.DB.Conn.Exec(r.DB.Ctx, query, number); err != nil {
-		slog.Error("Repository \"DeleteItemsFromOrder\" get next error:%w", err)
-		tx.Rollback(r.DB.Ctx)
-		return fmt.Errorf("get next error:%w", err)
-	}
-
-	slog.Info("Repository end \"DeleteOrder\" success")
-	return tx.Commit(r.DB.Ctx)*/
-
-	slog.Info("Repository ended \"DeleteOrder\" success")
+	slog.Info("Repository ended \"CancelOrder\" success")
 	return nil
 
 }
 
-func (r *OrderRepositoryStruct) OrderInfo(ctx *context.Context, number int) (error, *domain.Order) {
+func (r *OrderRepositoryStruct) GetOrder(ctx context.Context, number int) (*domain.Order, error) {
 
-	slog.Info("Repository started \"OrderInfo\"")
+	slog.Info("Repository started \"GetOrder\"")
 
 	r.Mtx.RLock()
 	defer r.Mtx.RUnlock()
@@ -298,20 +350,23 @@ func (r *OrderRepositoryStruct) OrderInfo(ctx *context.Context, number int) (err
 	query := `SELECT * FROM orders WHERE number = $1;`
 	var model OrderModel
 	if err := r.DB.Conn.QueryRow(r.DB.Ctx, query, number).Scan(&model.Id, &model.Number, &model.Email, &model.Address, &model.Status, &model.Time, &model.Cost); err != nil {
-		slog.Error("Repository \"OrderInfo\" get next error:%w", err)
-		return err, nil
+		slog.Error("Repository \"GetOrder\" get next error:%w", err)
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, domain.ErrOrderNotFound
+		}
+		return nil, err
 	}
 
 	order := ConvertModelToOrder(&model)
 
-	slog.Info("Repository ended \"OrderInfo\" success")
-	return nil, order
+	slog.Info("Repository ended \"GetOrder\" success")
+	return order, nil
 
 }
 
-func (r *OrderRepositoryStruct) OrderDetailInfo(ctx *context.Context, number int) (error, *[]domain.Item) {
+func (r *OrderRepositoryStruct) GetOrderDetails(ctx context.Context, number int) (*[]domain.Item, error) {
 
-	slog.Info("Repository started \"OrderDetailInfo\"")
+	slog.Info("Repository started \"GetOrderDetails\"")
 
 	r.Mtx.RLock()
 	defer r.Mtx.RUnlock()
@@ -319,34 +374,40 @@ func (r *OrderRepositoryStruct) OrderDetailInfo(ctx *context.Context, number int
 	query := `SELECT * FROM orders_items WHERE number = $1;`
 	rows, err := r.DB.Conn.Query(r.DB.Ctx, query, number)
 	if err != nil {
-		slog.Error("Repository \"OrderDetailInfo\" get next error:%w", err)
-		return err, nil
+		slog.Error("Repository \"GetOrderDetails\" get next error:%w", err)
+		return nil, err
 	}
+	defer rows.Close()
 
 	var model ItemModel
 	items := []domain.Item{}
 	for rows.Next() {
 
 		if err := rows.Scan(&model.Id, &model.Title, &model.RestTitle, &model.Composition, &model.Time, &model.Cost); err != nil {
-			slog.Error("Repository \"OrderDetailInfo\" get next error:%w", err)
-			return err, nil
+			slog.Error("Repository \"GetOrderDetails\" get next error:%w", err)
+			return nil, err
 		}
 
 		items = append(items, *ConvertModelToItem(&model))
 
 	}
 
-	slog.Info("Repository ended \"OrderDetailInfo\" success")
-	return nil, &items
+	if err := rows.Err(); err != nil {
+		slog.Error("Repository \"GetOrderDetails\" get next error:%w", err)
+		return nil, err
+	}
+
+	slog.Info("Repository ended \"GetOrderDetails\" success")
+	return &items, nil
 
 }
 
-func (r *OrderRepositoryStruct) ConfirmOrder(ctx *context.Context, number int, email string, newBalance float64) error {
+func (r *OrderRepositoryStruct) ConfirmOrder(ctx context.Context, number int, email string, newBalance float64) error {
 
 	slog.Info("Repository started \"ConfirmOrder\"")
 
-	r.Mtx.RLock()
-	defer r.Mtx.RUnlock()
+	r.Mtx.Lock()
+	defer r.Mtx.Unlock()
 
 	tx, err := r.DB.Conn.Begin(r.DB.Ctx)
 	if err != nil {
@@ -356,31 +417,48 @@ func (r *OrderRepositoryStruct) ConfirmOrder(ctx *context.Context, number int, e
 
 	query := `SELECT status FROM orders WHERE number = $1;`
 	status := ""
-	if err := r.DB.Conn.QueryRow(r.DB.Ctx, query, number).Scan(&status); err != nil {
+	if err := tx.QueryRow(r.DB.Ctx, query, number).Scan(&status); err != nil {
 		slog.Error("Repository \"ConfirmOrder\" get next error:%w", err)
 		tx.Rollback(r.DB.Ctx)
+		if errors.Is(err, sql.ErrNoRows) {
+			return domain.ErrOrderNotFound
+		}
 		return err
 	}
 
-	if status != "Created" {
+	if status != domain.StatusCreated {
 		slog.Error("Repository \"ConfirmOrder\" try to change order which status not created!")
 		tx.Rollback(r.DB.Ctx)
-		return err
+		return domain.ErrStatusNotCreated
 	}
 
-	status = "Confirmed"
+	status = domain.StatusCompleted
 	query = `UPDATE orders SET status = $1 WHERE number = $2;`
-	if _, err := r.DB.Conn.Exec(r.DB.Ctx, query, status, number); err != nil {
+	result, err := tx.Exec(r.DB.Ctx, query, status, number)
+	if err != nil {
 		slog.Error("Repository \"ConfirmOrder\" get next error:%w", err)
 		tx.Rollback(r.DB.Ctx)
 		return err
+	}
+
+	affected := result.RowsAffected()
+	if affected == 0 {
+		slog.Error("Repository \"ConfirmOrder\" get error with update")
+		return domain.ErrWithUpdate
 	}
 
 	query = `UPDATE users SET balance = $1 WHERE email = $2;`
-	if _, err := r.DB.Conn.Exec(r.DB.Ctx, query, newBalance, email); err != nil {
+	result, err = tx.Exec(r.DB.Ctx, query, newBalance, email)
+	if err != nil {
 		slog.Error("Repository \"ConfirmOrder\" get next error:%w", err)
 		tx.Rollback(r.DB.Ctx)
 		return err
+	}
+
+	affected = result.RowsAffected()
+	if affected == 0 {
+		slog.Error("Repository \"ConfirmOrder\" get error with update")
+		return domain.ErrWithUpdate
 	}
 
 	slog.Info("Repository ended \"ConfirmOrder\" success")
@@ -388,7 +466,7 @@ func (r *OrderRepositoryStruct) ConfirmOrder(ctx *context.Context, number int, e
 
 }
 
-func (r *OrderRepositoryStruct) FillUser(ctx *context.Context, email string) (error, *domain.User) {
+func (r *OrderRepositoryStruct) FillUser(ctx context.Context, email string) (*domain.User, error) {
 
 	query := "SELECT * FROM users WHERE email = $1;"
 
@@ -398,11 +476,14 @@ func (r *OrderRepositoryStruct) FillUser(ctx *context.Context, email string) (er
 	var model UserModel
 	if err := r.DB.Conn.QueryRow(r.DB.Ctx, query, email).Scan(&model.Id, &model.Name, &model.Email, &model.Address, &model.Balance); err != nil {
 		slog.Error("Repository \"FillUser\" with email %s get next error:%w", email, err)
-		return err, nil
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, domain.ErrUserNotFound
+		}
+		return nil, err
 	}
 
 	user := ConvertModelToUser(&model)
 
-	return nil, user
+	return user, nil
 
 }

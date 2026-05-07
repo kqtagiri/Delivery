@@ -14,7 +14,7 @@ import (
 func main() {
 
 	ctx := context.Context(context.Background())
-	err, db := database.NewDB(&ctx)
+	db, err := database.NewDB(ctx)
 	if err != nil {
 		slog.Error("Get next err when connect to database:%w", err)
 		return
@@ -85,9 +85,9 @@ func main() {
 	order.POST("/create", order_handler.CreateOrder)
 	order.POST("/add/:number", order_handler.AddItemsToOrder)
 	order.DELETE("/deleteitems/:number", order_handler.DeleteItemsFromOrder)
-	order.DELETE("/delete/:number", order_handler.DeleteOrder)
-	order.GET("/:number", order_handler.OrderInfo)
-	order.GET("/details/:number", order_handler.OrderDetailInfo)
+	order.DELETE("/delete/:number", order_handler.CancelOrder)
+	order.GET("/:number", order_handler.GetOrder)
+	order.GET("/details/:number", order_handler.GetOrderDetails)
 	order.POST("/confirm/:number", order_handler.ConfirmOrder)
 
 	r.Run(":9111")

@@ -88,13 +88,13 @@ func (h *RestaurantHandler) CreateRestaurant(c *gin.Context) {
 		return
 	}
 
-	err, restaurant := h.Service.CreateRestaurant(&ctx, req.Title, req.Description, req.Address, req.Rating)
+	restaurant, err := h.Service.CreateRestaurant(ctx, req.Title, req.Description, req.Address, req.Rating)
 	if err != nil {
-		if errors.Is(err, domain.ErrInvalidTitle) || errors.Is(err, domain.ErrInvalidDescription) || errors.Is(err, domain.ErrInvalidAddress) || errors.Is(err, domain.ErrInvalidRating) {
+		if errors.Is(err, domain.ErrInvalidTitle) || errors.Is(err, domain.ErrInvalidDescription) || errors.Is(err, domain.ErrInvalidAddress) || errors.Is(err, domain.ErrInvalidRating) || errors.Is(err, domain.ErrWithInsert) {
 			c.JSON(400, gin.H{"error": err})
-			return
+		} else {
+			c.JSON(500, gin.H{"error": err})
 		}
-		c.JSON(500, gin.H{"error": err})
 		return
 	}
 
@@ -119,7 +119,7 @@ func (h *RestaurantHandler) RestaurantsList(c *gin.Context) {
 	defer cancel()
 	start := time.Now()
 
-	err, rests := h.Service.RestaurantsList(&ctx)
+	rests, err := h.Service.RestaurantsList(ctx)
 	if err != nil {
 		c.JSON(500, gin.H{"error": err})
 		return
@@ -151,7 +151,7 @@ func (h *RestaurantHandler) RestaurantMenu(c *gin.Context) {
 	defer cancel()
 	start := time.Now()
 
-	err, menu := h.Service.RestaurantMenu(&ctx, title)
+	menu, err := h.Service.RestaurantMenu(ctx, title)
 	if err != nil {
 		c.JSON(500, gin.H{"error": err})
 		return
@@ -191,12 +191,12 @@ func (h *RestaurantHandler) AddNewItems(c *gin.Context) {
 
 	for _, dto := range itemsDTO {
 
-		if err := h.Service.AddNewItems(&ctx, dto.Title, dto.RestTitle, dto.Composition, dto.Time, dto.Cost); err != nil {
-			if errors.Is(err, domain.ErrInvalidTitle) || errors.Is(err, domain.ErrInvalidRestaurantTitle) || errors.Is(err, domain.ErrInvalidComposition) || errors.Is(err, domain.ErrInvalidCost) {
+		if err := h.Service.AddNewItems(ctx, dto.Title, dto.RestTitle, dto.Composition, dto.Time, dto.Cost); err != nil {
+			if errors.Is(err, domain.ErrInvalidTitle) || errors.Is(err, domain.ErrInvalidRestaurantTitle) || errors.Is(err, domain.ErrInvalidComposition) || errors.Is(err, domain.ErrInvalidCost) || errors.Is(err, domain.ErrInvalidTime) || errors.Is(err, domain.ErrWithInsert) {
 				c.JSON(400, gin.H{"error": err})
-				return
+			} else {
+				c.JSON(500, gin.H{"error": err})
 			}
-			c.JSON(500, gin.H{"error": err})
 			return
 		}
 
@@ -229,12 +229,12 @@ func (h *RestaurantHandler) DeleteItems(c *gin.Context) {
 
 	for _, dto := range itemsDTO {
 
-		if err := h.Service.DeleteItems(&ctx, dto.Title, dto.RestTitle); err != nil {
-			if errors.Is(err, domain.ErrInvalidTitle) || errors.Is(err, domain.ErrInvalidRestaurantTitle) {
+		if err := h.Service.DeleteItems(ctx, dto.Title, dto.RestTitle); err != nil {
+			if errors.Is(err, domain.ErrWithDelete) {
 				c.JSON(400, gin.H{"error": err})
-				return
+			} else {
+				c.JSON(500, gin.H{"error": err})
 			}
-			c.JSON(500, gin.H{"error": err})
 			return
 		}
 

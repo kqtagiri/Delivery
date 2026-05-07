@@ -1,13 +1,5 @@
 package domain
 
-import "errors"
-
-var (
-	ErrInvalidTitle       = errors.New("Invalid title")
-	ErrInvalidDescription = errors.New("Invalid description")
-	ErrInvalidRating      = errors.New("Invalid rating")
-)
-
 type Restaurant struct {
 	Title       string
 	Description string
@@ -15,29 +7,29 @@ type Restaurant struct {
 	Rating      float64
 }
 
-func NewRestaurant(title, description, address string, rating float64) (error, *Restaurant) {
+func NewRestaurant(title, description, address string, rating float64) (*Restaurant, error) {
 
 	if title == "" {
-		return ErrInvalidTitle, nil
+		return nil, ErrInvalidTitle
 	}
 
 	if description == "" {
-		return ErrInvalidDescription, nil
+		return nil, ErrInvalidDescription
 	}
 
 	if address == "" {
-		return ErrInvalidAddress, nil
+		return nil, ErrInvalidAddress
 	}
 
 	if rating > 5 || rating < 0 {
-		return ErrInvalidRating, nil
+		return nil, ErrInvalidRating
 	}
 
-	return nil, &Restaurant{
+	return &Restaurant{
 		Title:       title,
 		Description: description,
 		Address:     address,
 		Rating:      rating,
-	}
+	}, nil
 
 }
