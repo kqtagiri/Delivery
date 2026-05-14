@@ -35,7 +35,7 @@ type OrderDTO struct {
 
 type ItemDTOUser struct {
 	Title     string  `json:"title" binding:"required"`
-	RestTitle string  `json:"restaurant_title" binding:"required"`
+	RestTitle string  `json:"rest_title" binding:"required"`
 	Time      int     `json:"time"`
 	Cost      float64 `json:"cost"`
 }
@@ -320,8 +320,9 @@ func (h *OrderHandler) ConfirmOrder(c *gin.Context) {
 		c.JSON(400, gin.H{"error": "Get invalid number"})
 		return
 	}
-	email, check := c.GetQuery("email")
-	if !check {
+
+	var email string
+	if err := c.ShouldBindJSON(&email); err != nil {
 		slog.Error("User didn`t write his email!")
 		c.JSON(400, gin.H{"error": "You didn`t write your email!"})
 		return

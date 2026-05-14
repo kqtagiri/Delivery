@@ -4,7 +4,7 @@ import (
 	"context"
 	"delivery/internal/domain"
 	"delivery/internal/repository"
-	"fmt"
+	"errors"
 	"log/slog"
 )
 
@@ -122,7 +122,7 @@ func (s *OrderService) ConfirmOrder(ctx context.Context, number int, email strin
 
 	if user.Balance < order.Cost {
 		slog.Error("Cost > Balance, user - %s", email)
-		return fmt.Errorf("Don`t enough money on balance!")
+		return errors.New("Don`t enough money on balance!")
 	}
 
 	newBalance := user.Balance - order.Cost

@@ -6,7 +6,6 @@ import (
 	"delivery/internal/database"
 	"delivery/internal/domain"
 	"errors"
-	"fmt"
 	"log/slog"
 	"sync"
 )
@@ -59,15 +58,6 @@ func ConvertModelToOrder(model *OrderModel) *domain.Order {
 
 }
 
-type ItemInOrder struct {
-	Id        int
-	Number    int
-	Title     string
-	RestTitle string
-	Time      int
-	Cost      float64
-}
-
 func (r *OrderRepositoryStruct) CreateOrderTable() error {
 
 	slog.Info("Start create orders table")
@@ -78,8 +68,8 @@ func (r *OrderRepositoryStruct) CreateOrderTable() error {
 		email VARCHAR(100) NOT NULL,
 		address VARCHAR(300) NOT NULL,
 		status VARCHAR(15) NOT NULL,
-		time INT NOT NULL,
-		cost DECIMAL(9,2) NOT NULL,
+		time INT,
+		cost DECIMAL(9,2),
 		UNIQUE(email)
 	);`
 
@@ -101,6 +91,7 @@ func (r *OrderRepositoryStruct) CreateItemsInOrdersTable() error {
 		number INT NOT NULL,
 		title VARCHAR(100) NOT NULL,
 		rest_title VARCHAR(100) NOT NULL,
+		composition VARCHAR(300) NOT NULL,
 		time INT NOT NULL,
 		cost DECIMAL(9,2) NOT NULL
 	);`
@@ -127,7 +118,7 @@ func (r *OrderRepositoryStruct) CreateOrder(ctx context.Context, order *domain.O
 		return err
 	}
 
-	query := `INSERT INTO orders(email, address, status, time, cost) VALUES($1,$2,$3,$4,$5,$6);`
+	query := `INSERT INTO orders(email, address, status, time, cost) VALUES($1,$2,$3,$4,$5);`
 
 	result, err := tx.Exec(r.DB.Ctx, query, order.Email, order.Address, order.Status, order.Time, order.Cost)
 	if err != nil {
@@ -186,7 +177,7 @@ func (r *OrderRepositoryStruct) AddItemsToOrder(ctx context.Context, number int,
 	if status != domain.StatusCreated {
 		slog.Error("Repository \"AddItemsToOrder\" try to change order which status not created!")
 		tx.Rollback(r.DB.Ctx)
-		return fmt.Errorf("Status not created!")
+		return errors.New("Status not created!")
 	}
 
 	query = `SELECT * FROM menu WHERE title = $1 AND rest_title = $2;`
@@ -200,8 +191,8 @@ func (r *OrderRepositoryStruct) AddItemsToOrder(ctx context.Context, number int,
 		return err
 	}
 
-	query = `INSERT INTO orders_items(number, title, rest_title, cost, time) VALUES($1,$2,$3,$4,$5);`
-	result, err := tx.Exec(r.DB.Ctx, query, number, model.Title, model.RestTitle, model.Cost, model.Time)
+	query = `INSERT INTO orders_items(number, title, rest_title, composition, cost, time) VALUES($1,$2,$3,$4,$5,$6);`
+	result, err := tx.Exec(r.DB.Ctx, query, number, model.Title, model.RestTitle, model.Composition, model.Cost, model.Time)
 	if err != nil {
 		slog.Error("Repository \"AddItemsToOrder\" get next error:%w", err)
 		tx.Rollback(r.DB.Ctx)
@@ -215,7 +206,7 @@ func (r *OrderRepositoryStruct) AddItemsToOrder(ctx context.Context, number int,
 		return domain.ErrWithInsert
 	}
 
-	query = `UPDATE orders SET time = time + $1 AND cost = cost + $2 WHERE number = $3;`
+	query = `UPDATE orders SET time = time + $1, cost = cost + $2 WHERE number = $3;`
 	result, err = tx.Exec(r.DB.Ctx, query, model.Time, model.Cost, number)
 	if err != nil {
 		slog.Error("Repository \"AddItemsToOrder\" get next error:%w", err)
@@ -262,10 +253,10 @@ func (r *OrderRepositoryStruct) DeleteItemsFromOrder(ctx context.Context, number
 	if status != domain.StatusCreated {
 		slog.Error("Repository \"DeleteItemsFromOrder\" try to change order which status not created!")
 		tx.Rollback(r.DB.Ctx)
-		return fmt.Errorf("Status not created!")
+		return errors.New("Status not created!")
 	}
 
-	query = `SELECT (time, cost) FROM orders_items WHERE title = $1 AND restTitle = $2 AND number = $3;`
+	query = `SELECT time, cost FROM orders_items WHERE title = $1 AND rest_title = $2 AND number = $3;`
 
 	var time int
 	var cost float64
@@ -293,7 +284,7 @@ func (r *OrderRepositoryStruct) DeleteItemsFromOrder(ctx context.Context, number
 		return domain.ErrWithDelete
 	}
 
-	query = `UPDATE orders SET time = time - $1 AND cost = cost - $2 WHERE number = $3;`
+	query = `UPDATE orders SET time = time - $1, cost = cost - $2 WHERE number = $3;`
 
 	result, err = tx.Exec(r.DB.Ctx, query, time, cost, number)
 	if err != nil {
@@ -383,7 +374,8 @@ func (r *OrderRepositoryStruct) GetOrderDetails(ctx context.Context, number int)
 	items := []domain.Item{}
 	for rows.Next() {
 
-		if err := rows.Scan(&model.Id, &model.Title, &model.RestTitle, &model.Composition, &model.Time, &model.Cost); err != nil {
+		var number int
+		if err := rows.Scan(&model.Id, &number, &model.Title, &model.RestTitle, &model.Composition, &model.Time, &model.Cost); err != nil {
 			slog.Error("Repository \"GetOrderDetails\" get next error:%w", err)
 			return nil, err
 		}

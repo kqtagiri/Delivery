@@ -43,7 +43,7 @@ func ConvertRestToDTO(rest *domain.Restaurant) *RestDTO {
 
 type ItemDTOAdmin struct {
 	Title       string  `json:"title" binding:"required"`
-	RestTitle   string  `json:"restaurant_title" binding:"required"`
+	RestTitle   string  `json:"rest_title" binding:"required"`
 	Composition string  `json:"composition" binding:"required"`
 	Time        int     `json:"time" binding:"required"`
 	Cost        float64 `json:"cost" binding:"required"`
@@ -59,6 +59,11 @@ func ConvertItemToDTO(item *domain.Item) *ItemDTOAdmin {
 		Cost:        item.Cost,
 	}
 
+}
+
+type ItemDeleteDTO struct {
+	Title     string `json:"title" binding:"required"`
+	RestTitle string `json:"rest_title" binding:"required"`
 }
 
 // func ConvertDTOToItem(dto *ItemDTO) *domain.Item {
@@ -215,8 +220,8 @@ func (h *RestaurantHandler) DeleteItems(c *gin.Context) {
 
 	slog.Info("Handler started \"DeleteItems\"")
 
-	itemsDTO := []ItemDTOAdmin{}
-	if err := c.BindJSON(&itemsDTO); err != nil {
+	itemsDTO := []ItemDeleteDTO{}
+	if err := c.ShouldBindJSON(&itemsDTO); err != nil {
 		slog.Error("Handler \"DeleteItems\" get next error when parsing json:%w", err)
 		c.JSON(500, gin.H{"error": err})
 		return

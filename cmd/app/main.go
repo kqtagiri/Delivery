@@ -7,13 +7,18 @@ import (
 	"delivery/internal/repository"
 	"delivery/internal/service"
 	"log/slog"
+	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
 
 func main() {
 
-	ctx := context.Context(context.Background())
+	ctx := context.Background()
 	db, err := database.NewDB(ctx)
 	if err != nil {
 		slog.Error("Get next err when connect to database:%w", err)
@@ -90,6 +95,35 @@ func main() {
 	order.GET("/details/:number", order_handler.GetOrderDetails)
 	order.POST("/confirm/:number", order_handler.ConfirmOrder)
 
-	r.Run(":9111")
+	server := http.Server{
+		Addr:    ":9111",
+		Handler: r,
+	}
+
+	go func() {
+
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			slog.Error(err.Error())
+			return
+		}
+
+	}()
+
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	<-quit
+
+	context, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	if err := server.Shutdown(context); err != nil {
+		slog.Error(err.Error())
+		return
+	}
+
+	if err := db.Close(); err != nil {
+		slog.Error(err.Error())
+		return
+	}
 
 }

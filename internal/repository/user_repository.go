@@ -81,8 +81,8 @@ func (r *UserRepositoryStruct) RegisterAccount(ctx context.Context, u *domain.Us
 	r.Mtx.Lock()
 	defer r.Mtx.Unlock()
 
-	query := `INSERT INTO users (name, email, address) VALUES ($1,$2,$3);`
-	result, err := r.DB.Conn.Exec(r.DB.Ctx, query, u.Name, u.Email, u.Address)
+	query := `INSERT INTO users (name, email, address, balance) VALUES ($1,$2,$3,$4);`
+	result, err := r.DB.Conn.Exec(r.DB.Ctx, query, u.Name, u.Email, u.Address, u.Balance)
 	if err != nil {
 		slog.Error("Repository \"RegisterAccount\" get next error:%w", err)
 		return err

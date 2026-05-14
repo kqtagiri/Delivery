@@ -26,3 +26,12 @@ func NewDB(ctx context.Context) (*DB, error) {
 	}, nil
 
 }
+
+func (db *DB) Close() error {
+
+	if db.Conn != nil {
+		return db.Conn.Close(db.Ctx)
+	}
+	return nil
+
+}

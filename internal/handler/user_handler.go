@@ -13,7 +13,7 @@ import (
 
 type UserDTO struct {
 	Name    string  `json:"name" binding:"required"`
-	Email   string  `json:"email" binding:"email, required"`
+	Email   string  `json:"email" binding:"required,email"`
 	Address string  `json:"address" binding:"required"`
 	Balance float64 `json:"balance"`
 }
@@ -93,7 +93,7 @@ func (h *UserHandler) ReplenishBalance(c *gin.Context) {
 
 	email := c.Param("email")
 	var req ReplenishDTO
-	if err := c.ShouldBindJSON(req); err != nil {
+	if err := c.ShouldBindJSON(&req); err != nil {
 		slog.Error("Handler \"ReplenishBalance\" get next error when parsing json:%w", err)
 		c.JSON(400, gin.H{"error": err})
 		return
