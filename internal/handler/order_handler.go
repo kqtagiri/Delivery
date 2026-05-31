@@ -26,7 +26,7 @@ func NewOrderHandler(service *service.OrderService) *OrderHandler {
 
 type OrderDTO struct {
 	Number  int     `json:"number"`
-	Email   string  `json:"email" binding:"email,required"`
+	Email   string  `json:"email"`
 	Address string  `json:"address" binding:"required"`
 	Status  string  `json:"status"`
 	Time    int     `json:"time"`
@@ -73,21 +73,34 @@ func (h *OrderHandler) CreateOrder(c *gin.Context) {
 	defer cancel()
 	start := time.Now()
 
-	dto := OrderDTO{}
-	if err := c.ShouldBindJSON(&dto); err != nil {
-		slog.Error(err.Error())
-		c.JSON(500, gin.H{"error": err})
+	value, exists := c.Get("email")
+	if !exists {
+		slog.Error("Handler \"ReplenishBalance\" email not found in context")
+		c.JSON(401, gin.H{"error": "Email not found"})
+		return
+	}
+	email, ok := value.(string)
+	if !ok {
+		slog.Error("Handler \"ReplenishBalance\" get error when parsing value in string")
+		c.JSON(500, gin.H{"error": "Something went wrong"})
 		return
 	}
 
-	order, err := h.Service.CreateOrder(ctx, dto.Email, dto.Address)
+	dto := OrderDTO{}
+	if err := c.ShouldBindJSON(&dto); err != nil {
+		slog.Error(err.Error())
+		c.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
+
+	order, err := h.Service.CreateOrder(ctx, email, dto.Address)
 	if err != nil {
 		if errors.Is(err, domain.ErrInvalidAddress) || errors.Is(err, domain.ErrInvalidEmail) || errors.Is(err, domain.ErrWithInsert) {
-			c.JSON(400, gin.H{"error": err})
+			c.JSON(400, gin.H{"error": err.Error()})
 		} else if errors.Is(err, domain.ErrOrderNotFound) {
-			c.JSON(404, gin.H{"error": err})
+			c.JSON(404, gin.H{"error": err.Error()})
 		} else {
-			c.JSON(500, gin.H{"error": err})
+			c.JSON(500, gin.H{"error": err.Error()})
 		}
 		return
 	}
@@ -113,6 +126,19 @@ func (h *OrderHandler) AddItemsToOrder(c *gin.Context) {
 		return
 	}
 
+	value, exists := c.Get("email")
+	if !exists {
+		slog.Error("Handler \"ReplenishBalance\" email not found in context")
+		c.JSON(401, gin.H{"error": "Email not found"})
+		return
+	}
+	email, ok := value.(string)
+	if !ok {
+		slog.Error("Handler \"ReplenishBalance\" get error when parsing value in string")
+		c.JSON(500, gin.H{"error": "Something went wrong"})
+		return
+	}
+
 	ctx := c.Request.Context()
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
@@ -121,19 +147,19 @@ func (h *OrderHandler) AddItemsToOrder(c *gin.Context) {
 	itemsDTO := []ItemDTOUser{}
 	if err := c.ShouldBindJSON(&itemsDTO); err != nil {
 		slog.Error("\"AddItemsToOrder\":%w", err)
-		c.JSON(500, gin.H{"error": err})
+		c.JSON(500, gin.H{"error": err.Error()})
 		return
 	}
 
 	for _, dto := range itemsDTO {
 
-		if err := h.Service.AddItemsToOrder(ctx, number, dto.Title, dto.RestTitle); err != nil {
+		if err := h.Service.AddItemsToOrder(ctx, number, email, dto.Title, dto.RestTitle); err != nil {
 			if errors.Is(err, domain.ErrWithInsert) || errors.Is(err, domain.ErrWithUpdate) {
-				c.JSON(400, gin.H{"error": err})
+				c.JSON(400, gin.H{"error": err.Error()})
 			} else if errors.Is(err, domain.ErrItemNotFound) || errors.Is(err, domain.ErrOrderNotFound) {
-				c.JSON(404, gin.H{"error": err})
+				c.JSON(404, gin.H{"error": err.Error()})
 			} else {
-				c.JSON(500, gin.H{"error": err})
+				c.JSON(500, gin.H{"error": err.Error()})
 			}
 			return
 		}
@@ -161,6 +187,19 @@ func (h *OrderHandler) DeleteItemsFromOrder(c *gin.Context) {
 		return
 	}
 
+	value, exists := c.Get("email")
+	if !exists {
+		slog.Error("Handler \"ReplenishBalance\" email not found in context")
+		c.JSON(401, gin.H{"error": "Email not found"})
+		return
+	}
+	email, ok := value.(string)
+	if !ok {
+		slog.Error("Handler \"ReplenishBalance\" get error when parsing value in string")
+		c.JSON(500, gin.H{"error": "Something went wrong"})
+		return
+	}
+
 	ctx := c.Request.Context()
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
@@ -169,19 +208,19 @@ func (h *OrderHandler) DeleteItemsFromOrder(c *gin.Context) {
 	itemsDTO := []ItemDTOUser{}
 	if err := c.ShouldBindJSON(&itemsDTO); err != nil {
 		slog.Error("Handler \"DeleteItemsFromOrder\" get next error when parsing json:%w", err)
-		c.JSON(500, gin.H{"error": err})
+		c.JSON(500, gin.H{"error": err.Error()})
 		return
 	}
 
 	for _, dto := range itemsDTO {
 
-		if err := h.Service.DeleteItemsFromOrder(ctx, number, dto.Title, dto.RestTitle); err != nil {
+		if err := h.Service.DeleteItemsFromOrder(ctx, number, email, dto.Title, dto.RestTitle); err != nil {
 			if errors.Is(err, domain.ErrWithUpdate) || errors.Is(err, domain.ErrWithDelete) {
-				c.JSON(400, gin.H{"error": err})
+				c.JSON(400, gin.H{"error": err.Error()})
 			} else if errors.Is(err, domain.ErrItemNotFound) || errors.Is(err, domain.ErrOrderNotFound) {
-				c.JSON(404, gin.H{"error": err})
+				c.JSON(404, gin.H{"error": err.Error()})
 			} else {
-				c.JSON(500, gin.H{"error": err})
+				c.JSON(500, gin.H{"error": err.Error()})
 			}
 			return
 		}
@@ -209,16 +248,29 @@ func (h *OrderHandler) CancelOrder(c *gin.Context) {
 		return
 	}
 
+	value, exists := c.Get("email")
+	if !exists {
+		slog.Error("Handler \"ReplenishBalance\" email not found in context")
+		c.JSON(401, gin.H{"error": "Email not found"})
+		return
+	}
+	email, ok := value.(string)
+	if !ok {
+		slog.Error("Handler \"ReplenishBalance\" get error when parsing value in string")
+		c.JSON(500, gin.H{"error": "Something went wrong"})
+		return
+	}
+
 	ctx := c.Request.Context()
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 	start := time.Now()
 
-	if err := h.Service.CancelOrder(ctx, number); err != nil {
+	if err := h.Service.CancelOrder(ctx, number, email); err != nil {
 		if errors.Is(err, domain.ErrWithUpdate) {
-			c.JSON(400, gin.H{"error": err})
+			c.JSON(400, gin.H{"error": err.Error()})
 		} else {
-			c.JSON(500, gin.H{"error": err})
+			c.JSON(500, gin.H{"error": err.Error()})
 		}
 		return
 	}
@@ -244,17 +296,30 @@ func (h *OrderHandler) GetOrder(c *gin.Context) {
 		return
 	}
 
+	value, exists := c.Get("email")
+	if !exists {
+		slog.Error("Handler \"ReplenishBalance\" email not found in context")
+		c.JSON(401, gin.H{"error": "Email not found"})
+		return
+	}
+	email, ok := value.(string)
+	if !ok {
+		slog.Error("Handler \"ReplenishBalance\" get error when parsing value in string")
+		c.JSON(500, gin.H{"error": "Something went wrong"})
+		return
+	}
+
 	ctx := c.Request.Context()
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 	start := time.Now()
 
-	order, err := h.Service.GetOrder(ctx, number)
+	order, err := h.Service.GetOrder(ctx, number, email)
 	if err != nil {
 		if errors.Is(err, domain.ErrOrderNotFound) {
-			c.JSON(404, gin.H{"error": err})
+			c.JSON(404, gin.H{"error": err.Error()})
 		} else {
-			c.JSON(500, gin.H{"error": err})
+			c.JSON(500, gin.H{"error": err.Error()})
 		}
 		return
 	}
@@ -282,14 +347,27 @@ func (h *OrderHandler) GetOrderDetails(c *gin.Context) {
 		return
 	}
 
+	value, exists := c.Get("email")
+	if !exists {
+		slog.Error("Handler \"ReplenishBalance\" email not found in context")
+		c.JSON(401, gin.H{"error": "Email not found"})
+		return
+	}
+	email, ok := value.(string)
+	if !ok {
+		slog.Error("Handler \"ReplenishBalance\" get error when parsing value in string")
+		c.JSON(500, gin.H{"error": "Something went wrong"})
+		return
+	}
+
 	ctx := c.Request.Context()
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 	start := time.Now()
 
-	items, err := h.Service.GetOrderDetails(ctx, number)
+	items, err := h.Service.GetOrderDetails(ctx, number, email)
 	if err != nil {
-		c.JSON(500, gin.H{"error": err})
+		c.JSON(500, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -321,10 +399,16 @@ func (h *OrderHandler) ConfirmOrder(c *gin.Context) {
 		return
 	}
 
-	var email string
-	if err := c.ShouldBindJSON(&email); err != nil {
-		slog.Error("User didn`t write his email!")
-		c.JSON(400, gin.H{"error": "You didn`t write your email!"})
+	value, exists := c.Get("email")
+	if !exists {
+		slog.Error("Handler \"ReplenishBalance\" email not found in context")
+		c.JSON(401, gin.H{"error": "Email not found"})
+		return
+	}
+	email, ok := value.(string)
+	if !ok {
+		slog.Error("Handler \"ReplenishBalance\" get error when parsing value in string")
+		c.JSON(500, gin.H{"error": "Something went wrong"})
 		return
 	}
 
@@ -335,11 +419,11 @@ func (h *OrderHandler) ConfirmOrder(c *gin.Context) {
 
 	if err := h.Service.ConfirmOrder(ctx, number, email); err != nil {
 		if errors.Is(err, domain.ErrWithUpdate) || errors.Is(err, domain.ErrStatusNotCreated) {
-			c.JSON(400, gin.H{"error": err})
+			c.JSON(400, gin.H{"error": err.Error()})
 		} else if errors.Is(err, domain.ErrOrderNotFound) || errors.Is(err, domain.ErrUserNotFound) {
-			c.JSON(404, gin.H{"error": err})
+			c.JSON(404, gin.H{"error": err.Error()})
 		} else {
-			c.JSON(500, gin.H{"error": err})
+			c.JSON(500, gin.H{"error": err.Error()})
 		}
 		return
 	}

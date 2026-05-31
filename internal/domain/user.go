@@ -5,21 +5,31 @@ import (
 )
 
 type User struct {
-	Name    string
-	Email   string
-	Address string
-	Balance float64
+	Name     string
+	Email    string
+	Password string
+	Role     string //(user, admin)
+	Address  string
+	Balance  float64
 	//Phone_Number(in future)
 }
 
-func NewUser(name, email, address string) (*User, error) {
+func NewUser(name, email, password, role, address string) (*User, error) {
+
+	if name == "" {
+		return nil, ErrInvalidName
+	}
 
 	if _, err := mail.ParseAddress(email); err != nil {
 		return nil, ErrInvalidEmail
 	}
 
-	if name == "" {
-		return nil, ErrInvalidName
+	if password == "" || len(password) < 6 {
+		return nil, ErrInvalidPassword
+	}
+
+	if role != AdminRole && role != UserRole {
+		return nil, ErrInvalidRole
 	}
 
 	if address == "" {
@@ -27,10 +37,12 @@ func NewUser(name, email, address string) (*User, error) {
 	}
 
 	return &User{
-		Name:    name,
-		Email:   email,
-		Address: address,
-		Balance: 0,
+		Name:     name,
+		Email:    email,
+		Password: password,
+		Role:     role,
+		Address:  address,
+		Balance:  0,
 	}, nil
 
 }

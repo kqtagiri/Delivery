@@ -3,22 +3,82 @@ package main
 import (
 	"context"
 	"delivery/internal/database"
+	"delivery/internal/domain"
 	"delivery/internal/handler"
 	"delivery/internal/repository"
 	"delivery/internal/service"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt"
 )
+
+func AuthMiddleware(role string) gin.HandlerFunc {
+
+	return func(c *gin.Context) {
+
+		str := c.GetHeader("Authorization")
+		if str == "" {
+			slog.Error("Get invalid auth header")
+			c.JSON(400, gin.H{"error": "Invalid authorization header"})
+			c.Abort()
+			return
+		}
+
+		tokenStr := strings.TrimPrefix(str, "Bearer ")
+		if tokenStr == "" {
+			slog.Error("Get invalid auth header")
+			c.JSON(400, gin.H{"error": "Invalid authorization header"})
+			c.Abort()
+			return
+		}
+
+		claims := &domain.AccessTokenClaims{}
+		token, err := jwt.ParseWithClaims(tokenStr, claims, func(token *jwt.Token) (interface{}, error) {
+			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+				return nil, fmt.Errorf("Invalid singing method:%v", token.Header["alg"])
+			}
+			return []byte(os.Getenv("ACCESS_SECRET_KEY")), nil
+		})
+
+		if err != nil {
+			slog.Error("AuthMiddleware get next error:", err)
+			c.JSON(500, gin.H{"error": err})
+			c.Abort()
+			return
+		}
+
+		if token.Valid {
+			if claims.Role != role {
+				slog.Error("Invalid role")
+				c.JSON(403, gin.H{"error": "Invalid role"})
+				c.Abort()
+				return
+			}
+			c.Set("user_id", claims.UserId)
+			c.Set("email", claims.Email)
+			c.Set("role", claims.Role)
+			c.Next()
+		} else {
+			slog.Error("Invalid Token")
+			c.JSON(400, gin.H{"error": "Invalid token"})
+			c.Abort()
+		}
+
+	}
+
+}
 
 func main() {
 
-	ctx := context.Background()
+	ctx := context.Context(context.Background())
 	db, err := database.NewDB(ctx)
 	if err != nil {
 		slog.Error("Get next err when connect to database:%w", err)
@@ -73,27 +133,30 @@ func main() {
 	})
 
 	rest := r.Group("/restaurants")
-	rest.POST("/create", rest_handler.CreateRestaurant)
+	rest.POST("/create", AuthMiddleware(domain.AdminRole), rest_handler.CreateRestaurant) //admin
 	rest.GET("", rest_handler.RestaurantsList)
 	rest.GET("/:title", rest_handler.RestaurantMenu)
-	rest.POST("/:title", rest_handler.AddNewItems)
-	rest.DELETE("/:title", rest_handler.DeleteItems)
+	rest.POST("/:title", AuthMiddleware(domain.AdminRole), rest_handler.AddNewItems)   //admin
+	rest.DELETE("/:title", AuthMiddleware(domain.AdminRole), rest_handler.DeleteItems) //admin
 
 	users := r.Group("/users")
 	users.POST("/register", user_handler.RegisterAccount)
-	users.PATCH("/replenish/:email", user_handler.ReplenishBalance)
-	users.GET("/:email", user_handler.UserInfo)
-	users.GET("", user_handler.AllUsersInfo)
+	users.GET("/login", user_handler.Authorization)
+	users.GET("/refresh", user_handler.Refresh)
+	users.PATCH("/replenish", AuthMiddleware(domain.UserRole), user_handler.ReplenishBalance) // user
+	users.GET("", AuthMiddleware(domain.UserRole), user_handler.UserInfo)                     //user
+	users.GET("/all", AuthMiddleware(domain.AdminRole), user_handler.AllUsersInfo)            //admin
 	//users.GET("/history/:email", user_handler.UserHistoryInfo)
 
 	order := r.Group("/orders")
-	order.POST("/create", order_handler.CreateOrder)
-	order.POST("/add/:number", order_handler.AddItemsToOrder)
-	order.DELETE("/deleteitems/:number", order_handler.DeleteItemsFromOrder)
-	order.DELETE("/delete/:number", order_handler.CancelOrder)
-	order.GET("/:number", order_handler.GetOrder)
-	order.GET("/details/:number", order_handler.GetOrderDetails)
-	order.POST("/confirm/:number", order_handler.ConfirmOrder)
+	order.Use(AuthMiddleware(domain.UserRole))
+	order.POST("/create", order_handler.CreateOrder)                         //user
+	order.POST("/add/:number", order_handler.AddItemsToOrder)                //user
+	order.DELETE("/deleteitems/:number", order_handler.DeleteItemsFromOrder) //user
+	order.DELETE("/delete/:number", order_handler.CancelOrder)               //user
+	order.GET("/:number", order_handler.GetOrder)                            //user
+	order.GET("/details/:number", order_handler.GetOrderDetails)             //user
+	order.POST("/confirm/:number", order_handler.ConfirmOrder)               //user
 
 	server := http.Server{
 		Addr:    ":9111",

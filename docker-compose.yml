@@ -2,6 +2,8 @@ services:
   app:
     build: .
     container_name: app
+    env_file: 
+      - .env
     environment:
       CONN_STRING: ${CONN_STRING}
       DB_HOST: database

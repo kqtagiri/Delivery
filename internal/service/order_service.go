@@ -26,7 +26,7 @@ func (s *OrderService) CreateOrder(ctx context.Context, email, address string) (
 
 	order, err := domain.NewOrder(email, address)
 	if err != nil {
-		slog.Error("Service \"CreateOrder\" get next error:%w", err)
+		slog.Error("Service \"CreateOrder\" get next error:", err)
 		return nil, err
 	}
 
@@ -39,11 +39,11 @@ func (s *OrderService) CreateOrder(ctx context.Context, email, address string) (
 
 }
 
-func (s *OrderService) AddItemsToOrder(ctx context.Context, number int, title, restTitle string) error {
+func (s *OrderService) AddItemsToOrder(ctx context.Context, number int, email, title, restTitle string) error {
 
 	slog.Info("Service started \"AddItemsToOrder\"")
 
-	if err := s.Repo.AddItemsToOrder(ctx, number, title, restTitle); err != nil {
+	if err := s.Repo.AddItemsToOrder(ctx, number, email, title, restTitle); err != nil {
 		return err
 	}
 
@@ -52,11 +52,11 @@ func (s *OrderService) AddItemsToOrder(ctx context.Context, number int, title, r
 
 }
 
-func (s *OrderService) DeleteItemsFromOrder(ctx context.Context, number int, title, restTitle string) error {
+func (s *OrderService) DeleteItemsFromOrder(ctx context.Context, number int, email, title, restTitle string) error {
 
 	slog.Info("Service started \"DeleteItemsFromOrder\"")
 
-	if err := s.Repo.DeleteItemsFromOrder(ctx, number, title, restTitle); err != nil {
+	if err := s.Repo.DeleteItemsFromOrder(ctx, number, email, title, restTitle); err != nil {
 		return err
 	}
 
@@ -65,11 +65,11 @@ func (s *OrderService) DeleteItemsFromOrder(ctx context.Context, number int, tit
 
 }
 
-func (s *OrderService) CancelOrder(ctx context.Context, number int) error {
+func (s *OrderService) CancelOrder(ctx context.Context, number int, email string) error {
 
 	slog.Info("Service started \"CancelOrder\"")
 
-	if err := s.Repo.CancelOrder(ctx, number); err != nil {
+	if err := s.Repo.CancelOrder(ctx, number, email); err != nil {
 		return err
 	}
 
@@ -78,11 +78,11 @@ func (s *OrderService) CancelOrder(ctx context.Context, number int) error {
 
 }
 
-func (s *OrderService) GetOrder(ctx context.Context, number int) (*domain.Order, error) {
+func (s *OrderService) GetOrder(ctx context.Context, number int, email string) (*domain.Order, error) {
 
 	slog.Info("Service started \"GetOrder\"")
 
-	order, err := s.Repo.GetOrder(ctx, number)
+	order, err := s.Repo.GetOrder(ctx, number, email)
 	if err != nil {
 		return nil, err
 	}
@@ -92,11 +92,11 @@ func (s *OrderService) GetOrder(ctx context.Context, number int) (*domain.Order,
 
 }
 
-func (s *OrderService) GetOrderDetails(ctx context.Context, number int) (*[]domain.Item, error) {
+func (s *OrderService) GetOrderDetails(ctx context.Context, number int, email string) (*[]domain.Item, error) {
 
 	slog.Info("Service started \"GetOrderDetails\"")
 
-	items, err := s.Repo.GetOrderDetails(ctx, number)
+	items, err := s.Repo.GetOrderDetails(ctx, number, email)
 	if err != nil {
 		return nil, err
 	}
@@ -115,13 +115,13 @@ func (s *OrderService) ConfirmOrder(ctx context.Context, number int, email strin
 		return err
 	}
 
-	order, err := s.Repo.GetOrder(ctx, number)
+	order, err := s.Repo.GetOrder(ctx, number, email)
 	if err != nil {
 		return err
 	}
 
 	if user.Balance < order.Cost {
-		slog.Error("Cost > Balance, user - %s", email)
+		slog.Error("Cost > Balance, user - ", email)
 		return errors.New("Don`t enough money on balance!")
 	}
 

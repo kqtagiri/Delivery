@@ -4,7 +4,11 @@ import (
 	"context"
 	"delivery/internal/domain"
 	"delivery/internal/repository"
+	"fmt"
 	"log/slog"
+	"os"
+
+	"github.com/golang-jwt/jwt"
 )
 
 type UserService struct {
@@ -19,11 +23,11 @@ func NewUserService(repo repository.UserRepository) *UserService {
 
 }
 
-func (s *UserService) RegisterAccount(ctx context.Context, name, email, address string) (*domain.User, error) {
+func (s *UserService) RegisterAccount(ctx context.Context, name, email, password, role, address string) (*domain.User, error) {
 
 	slog.Info("Service started \"RegisterAccount\"")
 
-	user, err := domain.NewUser(name, email, address)
+	user, err := domain.NewUser(name, email, password, role, address)
 	if err != nil {
 		slog.Error("Service \"RegisterAccount\" get next err:%w", err)
 		return nil, err
@@ -35,6 +39,52 @@ func (s *UserService) RegisterAccount(ctx context.Context, name, email, address 
 
 	slog.Info("Service ended \"RegisterAccount\" success")
 	return user, nil
+
+}
+
+func (s *UserService) Authorization(ctx context.Context, email, password string) (*domain.Tokens, error) {
+
+	slog.Info("Service started \"Authorization\"")
+
+	tokens, err := s.Repo.Authorization(ctx, email, password)
+	if err != nil {
+		return nil, err
+	}
+
+	slog.Info("Service ended \"Authorization\" success")
+	return tokens, nil
+
+}
+
+func (s *UserService) Refresh(ctx context.Context, refreshToken string) (*domain.Tokens, error) {
+
+	slog.Info("Service started \"Refresh\"")
+
+	claims := &domain.RefreshTokenClaims{}
+	token, err := jwt.ParseWithClaims(refreshToken, claims, func(t *jwt.Token) (interface{}, error) {
+		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("Invalid singing method:%v", t.Header["alg"])
+		}
+		return []byte(os.Getenv("REFRESH_SECRET_KEY")), nil
+	})
+
+	if err != nil {
+		slog.Error("Service \"Refresh\" get next error:", err)
+		return nil, err
+	}
+
+	if !token.Valid {
+		slog.Error("Service \"Refresh\" get next error:", domain.ErrInvalidRefreshToken)
+		return nil, domain.ErrInvalidRefreshToken
+	}
+
+	tokens, err := s.Repo.Refresh(ctx, claims.UserId)
+	if err != nil {
+		return nil, err
+	}
+
+	slog.Info("Service ended \"Refresh\" success")
+	return tokens, nil
 
 }
 
@@ -65,13 +115,13 @@ func (s *UserService) UserInfo(ctx context.Context, email string) (*domain.User,
 
 	slog.Info("Service started \"UserInfo\"")
 
-	err, user := s.Repo.UserInfo(ctx, email)
+	user, err := s.Repo.UserInfo(ctx, email)
 	if err != nil {
-		return err, nil
+		return nil, err
 	}
 
 	slog.Info("Service ended \"UserInfo\" success")
-	return nil, user
+	return user, nil
 
 }
 

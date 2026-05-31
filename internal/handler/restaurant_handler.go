@@ -89,16 +89,16 @@ func (h *RestaurantHandler) CreateRestaurant(c *gin.Context) {
 	var req RestDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
 		slog.Error(err.Error())
-		c.JSON(400, gin.H{"error": err})
+		c.JSON(400, gin.H{"error": err.Error()})
 		return
 	}
 
 	restaurant, err := h.Service.CreateRestaurant(ctx, req.Title, req.Description, req.Address, req.Rating)
 	if err != nil {
 		if errors.Is(err, domain.ErrInvalidTitle) || errors.Is(err, domain.ErrInvalidDescription) || errors.Is(err, domain.ErrInvalidAddress) || errors.Is(err, domain.ErrInvalidRating) || errors.Is(err, domain.ErrWithInsert) {
-			c.JSON(400, gin.H{"error": err})
+			c.JSON(400, gin.H{"error": err.Error()})
 		} else {
-			c.JSON(500, gin.H{"error": err})
+			c.JSON(500, gin.H{"error": err.Error()})
 		}
 		return
 	}
@@ -126,7 +126,7 @@ func (h *RestaurantHandler) RestaurantsList(c *gin.Context) {
 
 	rests, err := h.Service.RestaurantsList(ctx)
 	if err != nil {
-		c.JSON(500, gin.H{"error": err})
+		c.JSON(500, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -158,7 +158,7 @@ func (h *RestaurantHandler) RestaurantMenu(c *gin.Context) {
 
 	menu, err := h.Service.RestaurantMenu(ctx, title)
 	if err != nil {
-		c.JSON(500, gin.H{"error": err})
+		c.JSON(500, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -185,7 +185,7 @@ func (h *RestaurantHandler) AddNewItems(c *gin.Context) {
 	itemsDTO := []ItemDTOAdmin{}
 	if err := c.ShouldBindJSON(&itemsDTO); err != nil {
 		slog.Error("Handler \"AddNewItems\" get next error when parsing json:%w", err)
-		c.JSON(400, gin.H{"error": err})
+		c.JSON(400, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -198,9 +198,9 @@ func (h *RestaurantHandler) AddNewItems(c *gin.Context) {
 
 		if err := h.Service.AddNewItems(ctx, dto.Title, dto.RestTitle, dto.Composition, dto.Time, dto.Cost); err != nil {
 			if errors.Is(err, domain.ErrInvalidTitle) || errors.Is(err, domain.ErrInvalidRestaurantTitle) || errors.Is(err, domain.ErrInvalidComposition) || errors.Is(err, domain.ErrInvalidCost) || errors.Is(err, domain.ErrInvalidTime) || errors.Is(err, domain.ErrWithInsert) {
-				c.JSON(400, gin.H{"error": err})
+				c.JSON(400, gin.H{"error": err.Error()})
 			} else {
-				c.JSON(500, gin.H{"error": err})
+				c.JSON(500, gin.H{"error": err.Error()})
 			}
 			return
 		}
@@ -223,7 +223,7 @@ func (h *RestaurantHandler) DeleteItems(c *gin.Context) {
 	itemsDTO := []ItemDeleteDTO{}
 	if err := c.ShouldBindJSON(&itemsDTO); err != nil {
 		slog.Error("Handler \"DeleteItems\" get next error when parsing json:%w", err)
-		c.JSON(500, gin.H{"error": err})
+		c.JSON(500, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -236,9 +236,9 @@ func (h *RestaurantHandler) DeleteItems(c *gin.Context) {
 
 		if err := h.Service.DeleteItems(ctx, dto.Title, dto.RestTitle); err != nil {
 			if errors.Is(err, domain.ErrWithDelete) {
-				c.JSON(400, gin.H{"error": err})
+				c.JSON(400, gin.H{"error": err.Error()})
 			} else {
-				c.JSON(500, gin.H{"error": err})
+				c.JSON(500, gin.H{"error": err.Error()})
 			}
 			return
 		}

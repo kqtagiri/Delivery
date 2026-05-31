@@ -127,7 +127,7 @@ func (r *RestaurantRepositoryStruct) CreateRestaurant(ctx context.Context, rest 
 	defer r.Mtx.Unlock()
 
 	query := `INSERT INTO restaurants (title, description, address, rating) VALUES($1,$2,$3,$4);`
-	result, err := r.DB.Conn.Exec(r.DB.Ctx, query, rest.Title, rest.Description, rest.Address, rest.Rating)
+	result, err := r.DB.Conn.Exec(ctx, query, rest.Title, rest.Description, rest.Address, rest.Rating)
 	if err != nil {
 		slog.Error("Repository \"CreateRestaurant\" get next error:%w", err)
 		return err
@@ -152,7 +152,7 @@ func (r *RestaurantRepositoryStruct) RestaurantsList(ctx context.Context) (*[]do
 	defer r.Mtx.RUnlock()
 
 	query := `SELECT * FROM restaurants;`
-	rows, err := r.DB.Conn.Query(r.DB.Ctx, query)
+	rows, err := r.DB.Conn.Query(ctx, query)
 	if err != nil {
 		slog.Error("Repository \"RestaurantsList\" get next error:%w", err)
 		return nil, err
@@ -186,7 +186,7 @@ func (r *RestaurantRepositoryStruct) RestaurantMenu(ctx context.Context, title s
 	defer r.Mtx.RUnlock()
 
 	query := `SELECT * FROM menu WHERE rest_title = $1;`
-	rows, err := r.DB.Conn.Query(r.DB.Ctx, query, title)
+	rows, err := r.DB.Conn.Query(ctx, query, title)
 	if err != nil {
 		slog.Error("Repository \"RestaurantMenu\" from %s get next error:%w", title, err)
 		return nil, err
@@ -220,7 +220,7 @@ func (r *RestaurantRepositoryStruct) AddNewItems(ctx context.Context, item *doma
 	defer r.Mtx.Unlock()
 
 	query := `INSERT INTO menu(title, rest_title, composition, time, cost) VALUES($1,$2,$3,$4,$5);`
-	result, err := r.DB.Conn.Exec(r.DB.Ctx, query, item.Title, item.RestTitle, item.Composition, item.Time, item.Cost)
+	result, err := r.DB.Conn.Exec(ctx, query, item.Title, item.RestTitle, item.Composition, item.Time, item.Cost)
 	if err != nil {
 		slog.Error("Repository \"AddNewItems\" get next error:%w", err)
 		return err
@@ -245,7 +245,7 @@ func (r *RestaurantRepositoryStruct) DeleteItems(ctx context.Context, title, res
 	defer r.Mtx.Unlock()
 
 	query := `DELETE FROM menu WHERE title = $1 AND rest_title = $2;`
-	result, err := r.DB.Conn.Exec(r.DB.Ctx, query, title, restTitle)
+	result, err := r.DB.Conn.Exec(ctx, query, title, restTitle)
 	if err != nil {
 		slog.Error("Repository \"DeleteItems\" get next error:%w", err)
 		return err

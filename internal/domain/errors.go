@@ -13,6 +13,8 @@ var (
 	ErrInvalidCost            = errors.New("Invalid cost")
 	ErrInvalidEmail           = errors.New("Invalid email")
 	ErrInvalidName            = errors.New("Invalid name")
+	ErrInvalidPassword        = errors.New("Invalid password")
+	ErrInvalidRole            = errors.New("Invalid role")
 	ErrInvalidAddress         = errors.New("Invalid address")
 	ErrInvalidReplenish       = errors.New("Invalid replenish")
 	ErrInvalidPrice           = errors.New("Invalid price")
@@ -29,7 +31,16 @@ var (
 
 	ErrStatusNotCreated = errors.New("Order status is completed or canceled")
 
+	ErrInvalidAccessToken   = errors.New("Invalid access token")
+	ErrInvalidRefreshToken  = errors.New("Invalid refresh token")
+	ErrInvalidAuthorization = errors.New("Invalid email or password")
+)
+
+const (
 	StatusCreated   = "Created"
 	StatusCanceled  = "Canceled"
 	StatusCompleted = "Completed"
+
+	UserRole  = "User"
+	AdminRole = "Admin"
 )
