@@ -18,6 +18,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt"
+	"github.com/redis/go-redis/v9"
 )
 
 func AuthMiddleware(role string) gin.HandlerFunc {
@@ -81,15 +82,26 @@ func main() {
 	ctx := context.Context(context.Background())
 	db, err := database.NewDB(ctx)
 	if err != nil {
-		slog.Error("Get next err when connect to database:%w", err)
+		slog.Error("Get next err when connect to database:", err)
 		return
 	}
+
+	addr := os.Getenv("REDIS_HOST")
+	if addr == "" {
+		addr = "localhost:6379"
+	}
+	rdb := redis.NewClient(&redis.Options{
+		Addr:     addr,
+		Password: "",
+		DB:       0,
+	})
+	defer rdb.Close()
 
 	user_repo := repository.NewUserRepositoryStruct(db)
 	user_service := service.NewUserService(user_repo)
 	user_handler := handler.NewUserHandler(user_service)
 
-	rest_repo := repository.NewRestaurantRepositoryStruct(db)
+	rest_repo := repository.NewRestaurantRepositoryStruct(db, rdb)
 	rest_service := service.NewRestaurantService(rest_repo)
 	rest_handler := handler.NewRestaurantHandler(rest_service)
 
@@ -98,27 +110,27 @@ func main() {
 	order_handler := handler.NewOrderHandler(order_service)
 
 	if err := user_repo.CreateUserTable(); err != nil {
-		slog.Error("Get next error when create users table:%w", err)
+		slog.Error("Get next error when create users table:", err)
 		return
 	}
 
 	if err := rest_repo.CreateMenuTable(); err != nil {
-		slog.Error("Get next error when create menu table:%w", err)
+		slog.Error("Get next error when create menu table:", err)
 		return
 	}
 
 	if err := rest_repo.CreateRestaurantTable(); err != nil {
-		slog.Error("Get next error when create restaurants table:%w", err)
+		slog.Error("Get next error when create restaurants table:", err)
 		return
 	}
 
 	if err := order_repo.CreateItemsInOrdersTable(); err != nil {
-		slog.Error("Get next error when create orders_items table:%w", err)
+		slog.Error("Get next error when create orders_items table:", err)
 		return
 	}
 
 	if err := order_repo.CreateOrderTable(); err != nil {
-		slog.Error("Get next error when create orders table:%w", err)
+		slog.Error("Get next error when create orders table:", err)
 		return
 	}
 

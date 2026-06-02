@@ -5,6 +5,7 @@ import (
 	"delivery/internal/domain"
 	"delivery/internal/service"
 	"errors"
+	"fmt"
 	"log/slog"
 	"time"
 
@@ -149,7 +150,7 @@ func (h *RestaurantHandler) RestaurantsList(c *gin.Context) {
 func (h *RestaurantHandler) RestaurantMenu(c *gin.Context) {
 
 	title := c.Param("title")
-	slog.Info("Handler started \"RestaurantMenu\" from %s", title)
+	slog.Info(fmt.Sprintf("Handler started \"RestaurantMenu\" from %s", title))
 
 	ctx := c.Request.Context()
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
@@ -163,7 +164,7 @@ func (h *RestaurantHandler) RestaurantMenu(c *gin.Context) {
 	}
 
 	if time.Since(start) > 4*time.Second {
-		slog.Warn("\"RestaurantMenu\" from %s took a lot of time", title)
+		slog.Warn(fmt.Sprintf("\"RestaurantMenu\" from %s took a lot of time", title))
 	}
 
 	dtos := []ItemDTOAdmin{}
@@ -173,7 +174,7 @@ func (h *RestaurantHandler) RestaurantMenu(c *gin.Context) {
 
 	}
 
-	slog.Info("Handler ended \"RestaurantMenu\" from %s success", title)
+	slog.Info(fmt.Sprintf("Handler ended \"RestaurantMenu\" from %s success", title))
 	c.JSON(200, dtos)
 
 }
@@ -184,7 +185,7 @@ func (h *RestaurantHandler) AddNewItems(c *gin.Context) {
 
 	itemsDTO := []ItemDTOAdmin{}
 	if err := c.ShouldBindJSON(&itemsDTO); err != nil {
-		slog.Error("Handler \"AddNewItems\" get next error when parsing json:%w", err)
+		slog.Error("Handler \"AddNewItems\" get next error when parsing json:", err.Error())
 		c.JSON(400, gin.H{"error": err.Error()})
 		return
 	}
@@ -222,7 +223,7 @@ func (h *RestaurantHandler) DeleteItems(c *gin.Context) {
 
 	itemsDTO := []ItemDeleteDTO{}
 	if err := c.ShouldBindJSON(&itemsDTO); err != nil {
-		slog.Error("Handler \"DeleteItems\" get next error when parsing json:%w", err)
+		slog.Error("Handler \"DeleteItems\" get next error when parsing json:", err.Error())
 		c.JSON(500, gin.H{"error": err.Error()})
 		return
 	}

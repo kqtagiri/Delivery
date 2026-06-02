@@ -7,7 +7,10 @@ services:
     environment:
       CONN_STRING: ${CONN_STRING}
       DB_HOST: database
+      REDIS_HOST: redis:6379
     depends_on:
+      redis:
+        condition: service_started
       database:
         condition: service_healthy
     restart: on-failure
@@ -30,6 +33,17 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    restart: unless-stopped 
+
+  redis:
+    image: redis:alpine
+    container_name: redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped 
 
 volumes:
   pgdata:
+  redis_data:

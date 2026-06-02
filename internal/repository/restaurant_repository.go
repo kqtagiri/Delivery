@@ -4,9 +4,14 @@ import (
 	"context"
 	"delivery/internal/database"
 	"delivery/internal/domain"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
 	"sync"
+	"time"
+
+	"github.com/redis/go-redis/v9"
 )
 
 var (
@@ -24,13 +29,15 @@ type RestaurantRepository interface {
 type RestaurantRepositoryStruct struct {
 	Mtx sync.RWMutex
 	DB  *database.DB
+	RDB *redis.Client
 }
 
-func NewRestaurantRepositoryStruct(db *database.DB) *RestaurantRepositoryStruct {
+func NewRestaurantRepositoryStruct(db *database.DB, rdb *redis.Client) *RestaurantRepositoryStruct {
 
 	return &RestaurantRepositoryStruct{
 		Mtx: sync.RWMutex{},
 		DB:  db,
+		RDB: rdb,
 	}
 
 }
@@ -129,13 +136,13 @@ func (r *RestaurantRepositoryStruct) CreateRestaurant(ctx context.Context, rest 
 	query := `INSERT INTO restaurants (title, description, address, rating) VALUES($1,$2,$3,$4);`
 	result, err := r.DB.Conn.Exec(ctx, query, rest.Title, rest.Description, rest.Address, rest.Rating)
 	if err != nil {
-		slog.Error("Repository \"CreateRestaurant\" get next error:%w", err)
+		slog.Error("Repository \"CreateRestaurant\" get next error:", err.Error())
 		return err
 	}
 
 	affected := result.RowsAffected()
 	if affected != 1 {
-		slog.Error("Repository \"CreateRestaurant\" get next error:%w", domain.ErrWithInsert)
+		slog.Error("Repository \"CreateRestaurant\" get next error:", domain.ErrWithInsert)
 		return domain.ErrWithInsert
 	}
 
@@ -151,10 +158,23 @@ func (r *RestaurantRepositoryStruct) RestaurantsList(ctx context.Context) (*[]do
 	r.Mtx.RLock()
 	defer r.Mtx.RUnlock()
 
+	data, err := r.RDB.Get(ctx, "restaurants_list").Result()
+	if err != nil && err != redis.Nil {
+		slog.Warn("Repository \"RestaurantsList\" get next error when get restaurants_list from redis:", err.Error())
+	} else if err == nil {
+		rests := []domain.Restaurant{}
+		if err := json.Unmarshal([]byte(data), &rests); err != nil {
+			slog.Warn("Repository \"RestaurantsList\" get next error when parsing json in struct:", err.Error())
+		} else {
+			slog.Info("Repository ended \"RestaurantsList\" by redis")
+			return &rests, nil
+		}
+	}
+
 	query := `SELECT * FROM restaurants;`
 	rows, err := r.DB.Conn.Query(ctx, query)
 	if err != nil {
-		slog.Error("Repository \"RestaurantsList\" get next error:%w", err)
+		slog.Error("Repository \"RestaurantsList\" get next error:", err.Error())
 		return nil, err
 	}
 	defer rows.Close()
@@ -169,8 +189,17 @@ func (r *RestaurantRepositoryStruct) RestaurantsList(ctx context.Context) (*[]do
 	}
 
 	if err := rows.Err(); err != nil {
-		slog.Error("Repository \"RestaurantsList\" get next error:%w", err)
+		slog.Error("Repository \"RestaurantsList\" get next error:", err.Error())
 		return nil, err
+	}
+
+	data2, err := json.Marshal(rests)
+	if err != nil {
+		slog.Warn("Repository \"RestaurantsList\" get next error when parsing struct in json:", err.Error())
+	} else {
+		if err := r.RDB.Set(ctx, "restaurants_list", data2, time.Hour).Err(); err != nil {
+			slog.Warn("Repository \"RestaurantsList\" get next error when set rests in redis:", err.Error())
+		}
 	}
 
 	slog.Info("Repository ended \"RestaurantsList\" success")
@@ -180,15 +209,29 @@ func (r *RestaurantRepositoryStruct) RestaurantsList(ctx context.Context) (*[]do
 
 func (r *RestaurantRepositoryStruct) RestaurantMenu(ctx context.Context, title string) (*[]domain.Item, error) {
 
-	slog.Info("Repository started \"RestaurantMenu\" from %s", title)
+	slog.Info(fmt.Sprintf("Repository started \"RestaurantMenu\" from %s", title))
 
 	r.Mtx.RLock()
 	defer r.Mtx.RUnlock()
 
+	key := fmt.Sprint("restaurant_menu:" + title)
+	data, err := r.RDB.Get(ctx, key).Result()
+	if err != nil && err != redis.Nil {
+		slog.Warn("Repository \"RestaurantMenu\" get next error when get menu from redis:", err.Error())
+	} else if err == nil {
+		menu := []domain.Item{}
+		if err := json.Unmarshal([]byte(data), &menu); err != nil {
+			slog.Warn("Repository \"RestaurantMenu\" get next error when parsing json in struct:", err.Error())
+		} else {
+			slog.Info(fmt.Sprintf("Repository ended \"RestaurantMenu\" from %s by redis:", title))
+			return &menu, nil
+		}
+	}
+
 	query := `SELECT * FROM menu WHERE rest_title = $1;`
 	rows, err := r.DB.Conn.Query(ctx, query, title)
 	if err != nil {
-		slog.Error("Repository \"RestaurantMenu\" from %s get next error:%w", title, err)
+		slog.Error(fmt.Sprintf("Repository \"RestaurantMenu\" from %s get next error:", title, err.Error()))
 		return nil, err
 	}
 	defer rows.Close()
@@ -203,11 +246,18 @@ func (r *RestaurantRepositoryStruct) RestaurantMenu(ctx context.Context, title s
 	}
 
 	if err := rows.Err(); err != nil {
-		slog.Error("Repository \"RestaurantsMenu\" get next error:%w", err)
+		slog.Error("Repository \"RestaurantMenu\" get next error:", err.Error())
 		return nil, err
 	}
 
-	slog.Info("Repository ended \"RestaurantMenu\" from %s success", title)
+	data2, err := json.Marshal(items)
+	if err != nil {
+		slog.Warn("Repository \"RestaurantMenu\" get next error when parsing struct in json:", err.Error())
+	} else {
+		r.RDB.Set(ctx, key, data2, time.Second*60*15)
+	}
+
+	slog.Info(fmt.Sprintf("Repository ended \"RestaurantMenu\" from %s success", title))
 	return &items, nil
 
 }
@@ -222,14 +272,19 @@ func (r *RestaurantRepositoryStruct) AddNewItems(ctx context.Context, item *doma
 	query := `INSERT INTO menu(title, rest_title, composition, time, cost) VALUES($1,$2,$3,$4,$5);`
 	result, err := r.DB.Conn.Exec(ctx, query, item.Title, item.RestTitle, item.Composition, item.Time, item.Cost)
 	if err != nil {
-		slog.Error("Repository \"AddNewItems\" get next error:%w", err)
+		slog.Error("Repository \"AddNewItems\" get next error:", err.Error())
 		return err
 	}
 
 	affected := result.RowsAffected()
 	if affected != 1 {
-		slog.Error("Repository \"AddNewItems\" get next error:%w", domain.ErrWithInsert)
+		slog.Error("Repository \"AddNewItems\" get next error:", domain.ErrWithInsert)
 		return domain.ErrWithInsert
+	}
+
+	key := fmt.Sprint("restaurant_menu:" + item.RestTitle)
+	if err := r.RDB.Del(ctx, key).Err(); err != nil {
+		slog.Warn("Get next error when delete data from redis:", err.Error())
 	}
 
 	slog.Info("Repository ended \"AddNewItems\" success")
@@ -247,14 +302,19 @@ func (r *RestaurantRepositoryStruct) DeleteItems(ctx context.Context, title, res
 	query := `DELETE FROM menu WHERE title = $1 AND rest_title = $2;`
 	result, err := r.DB.Conn.Exec(ctx, query, title, restTitle)
 	if err != nil {
-		slog.Error("Repository \"DeleteItems\" get next error:%w", err)
+		slog.Error("Repository \"DeleteItems\" get next error:", err)
 		return err
 	}
 
 	affected := result.RowsAffected()
 	if affected == 0 {
-		slog.Error("Repository \"DeleteItems\" get next error:%w", domain.ErrWithDelete)
+		slog.Error("Repository \"DeleteItems\" get next error:", domain.ErrWithDelete)
 		return domain.ErrWithDelete
+	}
+
+	key := fmt.Sprint("restaurant_menu:" + restTitle)
+	if err := r.RDB.Del(ctx, key).Err(); err != nil {
+		slog.Warn("Get next error when delete data from redis:", err.Error())
 	}
 
 	slog.Info("Repository ended \"DeleteItems\" success")

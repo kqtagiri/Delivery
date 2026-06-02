@@ -1,10 +1,10 @@
 package domain
 
 type Restaurant struct {
-	Title       string
-	Description string
-	Address     string
-	Rating      float64
+	Title       string  `json:"title"`
+	Description string  `json:"desc"`
+	Address     string  `json:"address"`
+	Rating      float64 `json:"rating"`
 }
 
 func NewRestaurant(title, description, address string, rating float64) (*Restaurant, error) {

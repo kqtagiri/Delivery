@@ -4,6 +4,7 @@ import (
 	"context"
 	"delivery/internal/domain"
 	"delivery/internal/repository"
+	"fmt"
 	"log/slog"
 )
 
@@ -25,7 +26,7 @@ func (s *RestaurantService) CreateRestaurant(ctx context.Context, title, desc, a
 
 	rest, err := domain.NewRestaurant(title, desc, addr, rating)
 	if err != nil {
-		slog.Info("Service \"CreateRestaurant\" get next error:%w", err)
+		slog.Info("Service \"CreateRestaurant\" get next error:", err.Error())
 		return nil, err
 	}
 
@@ -54,14 +55,14 @@ func (s *RestaurantService) RestaurantsList(ctx context.Context) (*[]domain.Rest
 
 func (s *RestaurantService) RestaurantMenu(ctx context.Context, title string) (*[]domain.Item, error) {
 
-	slog.Info("Service started \"RestaurantMenu\" from %s", title)
+	slog.Info(fmt.Sprintf("Service started \"RestaurantMenu\" from %s", title))
 
 	items, err := s.Repo.RestaurantMenu(ctx, title)
 	if err != nil {
 		return nil, err
 	}
 
-	slog.Info("Service ended \"RestaurantMenu\" from %s success", title)
+	slog.Info(fmt.Sprintf("Service ended \"RestaurantMenu\" from %s success", title))
 	return items, nil
 
 }
@@ -72,7 +73,7 @@ func (s *RestaurantService) AddNewItems(ctx context.Context, title, restTitle, c
 
 	item, err := domain.NewItem(title, composition, restTitle, time, cost)
 	if err != nil {
-		slog.Info("Service \"AddNewItems\" get next error when create a new item:%w", err)
+		slog.Info("Service \"AddNewItems\" get next error when create a new item:", err.Error())
 		return err
 	}
 

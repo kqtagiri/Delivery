@@ -1,11 +1,11 @@
 package domain
 
 type Item struct {
-	Title       string
-	RestTitle   string
-	Composition string
-	Time        int
-	Cost        float64
+	Title       string  `json:"title"`
+	RestTitle   string  `json:"rest_title"`
+	Composition string  `json:"composition"`
+	Time        int     `json:"time"`
+	Cost        float64 `json:"cost"`
 }
 
 func NewItem(title, composition, r_title string, time int, cost float64) (*Item, error) {
