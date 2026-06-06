@@ -67,17 +67,17 @@ type ItemDeleteDTO struct {
 	RestTitle string `json:"rest_title" binding:"required"`
 }
 
-// func ConvertDTOToItem(dto *ItemDTO) *domain.Item {
-
-// 	return &domain.Item{
-// 		Title:       dto.Title,
-// 		RestTitle:   dto.RestTitle,
-// 		Composition: dto.Composition,
-// 		Cost:        dto.Cost,
-// 	}
-
-// }
-
+// @Summary Create restaurant
+// @Description Создание нового ресторана
+// @Tags rest
+// @Router /restaurants/create [post]
+// @Accept json
+// @Produce json
+// @Param body body RestDTO true "Название, адрес и рейтинг(опционально описание)"
+// @Success 201 {object} RestDTO "Ресторан успешно создан"
+// @Failure 400 {object} domain.ErrorResponse "Неправильные входные данные"
+// @Failure 500 {object} domain.ErrorResponse "Произошла ошибка на сервере"
+// @Security Auth
 func (h *RestaurantHandler) CreateRestaurant(c *gin.Context) {
 
 	slog.Info("Handler started \"CreateRestaurant\"")
@@ -90,16 +90,16 @@ func (h *RestaurantHandler) CreateRestaurant(c *gin.Context) {
 	var req RestDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
 		slog.Error(err.Error())
-		c.JSON(400, gin.H{"error": err.Error()})
+		c.JSON(400, domain.ErrorResponse{Error: err.Error()})
 		return
 	}
 
 	restaurant, err := h.Service.CreateRestaurant(ctx, req.Title, req.Description, req.Address, req.Rating)
 	if err != nil {
 		if errors.Is(err, domain.ErrInvalidTitle) || errors.Is(err, domain.ErrInvalidDescription) || errors.Is(err, domain.ErrInvalidAddress) || errors.Is(err, domain.ErrInvalidRating) || errors.Is(err, domain.ErrWithInsert) {
-			c.JSON(400, gin.H{"error": err.Error()})
+			c.JSON(400, domain.ErrorResponse{Error: err.Error()})
 		} else {
-			c.JSON(500, gin.H{"error": err.Error()})
+			c.JSON(500, domain.ErrorResponse{Error: err.Error()})
 		}
 		return
 	}
@@ -116,6 +116,13 @@ func (h *RestaurantHandler) CreateRestaurant(c *gin.Context) {
 
 }
 
+// @Summary Restaurants list
+// @Description Список ресторанов
+// @Tags rest
+// @Router /restaurants [get]
+// @Produce json
+// @Success 200 {array} RestDTO "OK"
+// @Failure 500 {object} domain.ErrorResponse "Произошла ошибка на сервере"
 func (h *RestaurantHandler) RestaurantsList(c *gin.Context) {
 
 	slog.Info("Handler started \"RestaurantsList\"")
@@ -127,7 +134,7 @@ func (h *RestaurantHandler) RestaurantsList(c *gin.Context) {
 
 	rests, err := h.Service.RestaurantsList(ctx)
 	if err != nil {
-		c.JSON(500, gin.H{"error": err.Error()})
+		c.JSON(500, domain.ErrorResponse{Error: err.Error()})
 		return
 	}
 
@@ -147,6 +154,14 @@ func (h *RestaurantHandler) RestaurantsList(c *gin.Context) {
 
 }
 
+// @Summary Restaurant menu
+// @Description Просмотр меню ресторана
+// @Tags rest
+// @Router /restaurants/{title} [get]
+// @Produce json
+// @Param title path string true "Название ресторана"
+// @Success 200 {array} ItemDTOAdmin "OK"
+// @Failure 500 {object} domain.ErrorResponse "Произошла ошибка на сервере"
 func (h *RestaurantHandler) RestaurantMenu(c *gin.Context) {
 
 	title := c.Param("title")
@@ -159,7 +174,7 @@ func (h *RestaurantHandler) RestaurantMenu(c *gin.Context) {
 
 	menu, err := h.Service.RestaurantMenu(ctx, title)
 	if err != nil {
-		c.JSON(500, gin.H{"error": err.Error()})
+		c.JSON(500, domain.ErrorResponse{Error: err.Error()})
 		return
 	}
 
@@ -179,6 +194,17 @@ func (h *RestaurantHandler) RestaurantMenu(c *gin.Context) {
 
 }
 
+// @Summary Add new items
+// @Description Добавление новых блюд в меню
+// @Tags rest
+// @Router /restaurants [post]
+// @Accept json
+// @Produce json
+// @Param body body []ItemDTOAdmin true "Название блюда, ресторана, состав, время приготовления и цена"
+// @Success 201 "Блюда успешно добавлены"
+// @Failure 400 {object} domain.ErrorResponse "Неправильные входные данные"
+// @Failure 500 {object} domain.ErrorResponse "Произошла ошибка на сервере"
+// @Security Auth
 func (h *RestaurantHandler) AddNewItems(c *gin.Context) {
 
 	slog.Info("Handler started \"AddNewItems\"")
@@ -186,7 +212,7 @@ func (h *RestaurantHandler) AddNewItems(c *gin.Context) {
 	itemsDTO := []ItemDTOAdmin{}
 	if err := c.ShouldBindJSON(&itemsDTO); err != nil {
 		slog.Error("Handler \"AddNewItems\" get next error when parsing json:", err.Error())
-		c.JSON(400, gin.H{"error": err.Error()})
+		c.JSON(400, domain.ErrorResponse{Error: err.Error()})
 		return
 	}
 
@@ -199,9 +225,9 @@ func (h *RestaurantHandler) AddNewItems(c *gin.Context) {
 
 		if err := h.Service.AddNewItems(ctx, dto.Title, dto.RestTitle, dto.Composition, dto.Time, dto.Cost); err != nil {
 			if errors.Is(err, domain.ErrInvalidTitle) || errors.Is(err, domain.ErrInvalidRestaurantTitle) || errors.Is(err, domain.ErrInvalidComposition) || errors.Is(err, domain.ErrInvalidCost) || errors.Is(err, domain.ErrInvalidTime) || errors.Is(err, domain.ErrWithInsert) {
-				c.JSON(400, gin.H{"error": err.Error()})
+				c.JSON(400, domain.ErrorResponse{Error: err.Error()})
 			} else {
-				c.JSON(500, gin.H{"error": err.Error()})
+				c.JSON(500, domain.ErrorResponse{Error: err.Error()})
 			}
 			return
 		}
@@ -217,6 +243,17 @@ func (h *RestaurantHandler) AddNewItems(c *gin.Context) {
 
 }
 
+// @Summary Delete items
+// @Description Удаление блюд из меню
+// @Tags rest
+// @Router /restaurants/delete [post]
+// @Accept json
+// @Produce json
+// @Param body body []ItemDeleteDTO true "Названия блюд и ресторанов"
+// @Success 200 "Блюда успешно удалены"
+// @Failure 400 {object} domain.ErrorResponse "Неправильные входные данные"
+// @Failure 500 {object} domain.ErrorResponse "Произошла ошибка на сервере"
+// @Security Auth
 func (h *RestaurantHandler) DeleteItems(c *gin.Context) {
 
 	slog.Info("Handler started \"DeleteItems\"")
@@ -224,7 +261,7 @@ func (h *RestaurantHandler) DeleteItems(c *gin.Context) {
 	itemsDTO := []ItemDeleteDTO{}
 	if err := c.ShouldBindJSON(&itemsDTO); err != nil {
 		slog.Error("Handler \"DeleteItems\" get next error when parsing json:", err.Error())
-		c.JSON(500, gin.H{"error": err.Error()})
+		c.JSON(500, domain.ErrorResponse{Error: err.Error()})
 		return
 	}
 
@@ -237,9 +274,9 @@ func (h *RestaurantHandler) DeleteItems(c *gin.Context) {
 
 		if err := h.Service.DeleteItems(ctx, dto.Title, dto.RestTitle); err != nil {
 			if errors.Is(err, domain.ErrWithDelete) {
-				c.JSON(400, gin.H{"error": err.Error()})
+				c.JSON(400, domain.ErrorResponse{Error: err.Error()})
 			} else {
-				c.JSON(500, gin.H{"error": err.Error()})
+				c.JSON(500, domain.ErrorResponse{Error: err.Error()})
 			}
 			return
 		}

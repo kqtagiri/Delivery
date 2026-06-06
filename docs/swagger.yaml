@@ -1,0 +1,718 @@
+definitions:
+  domain.ErrorResponse:
+    properties:
+      error:
+        type: string
+    type: object
+  handler.ItemDTOAdmin:
+    properties:
+      composition:
+        type: string
+      cost:
+        type: number
+      rest_title:
+        type: string
+      time:
+        type: integer
+      title:
+        type: string
+    required:
+    - composition
+    - cost
+    - rest_title
+    - time
+    - title
+    type: object
+  handler.ItemDTOUser:
+    properties:
+      cost:
+        type: number
+      rest_title:
+        type: string
+      time:
+        type: integer
+      title:
+        type: string
+    required:
+    - rest_title
+    - title
+    type: object
+  handler.ItemDeleteDTO:
+    properties:
+      rest_title:
+        type: string
+      title:
+        type: string
+    required:
+    - rest_title
+    - title
+    type: object
+  handler.OrderDTO:
+    properties:
+      address:
+        type: string
+      cost:
+        type: number
+      email:
+        type: string
+      number:
+        type: integer
+      status:
+        type: string
+      time:
+        type: integer
+    required:
+    - address
+    type: object
+  handler.ReplenishDTO:
+    properties:
+      balance:
+        type: number
+    required:
+    - balance
+    type: object
+  handler.ResponseWithToken:
+    properties:
+      access_token:
+        type: string
+    type: object
+  handler.RestDTO:
+    properties:
+      address:
+        type: string
+      description:
+        type: string
+      rating:
+        type: number
+      title:
+        type: string
+    required:
+    - address
+    - rating
+    - title
+    type: object
+  handler.UserAuth:
+    properties:
+      email:
+        type: string
+      password:
+        type: string
+    required:
+    - email
+    - password
+    type: object
+  handler.UserDTO:
+    properties:
+      address:
+        type: string
+      balance:
+        type: number
+      email:
+        type: string
+      name:
+        type: string
+      password:
+        type: string
+      role:
+        type: string
+    required:
+    - address
+    - email
+    - name
+    - password
+    - role
+    type: object
+host: localhost:9111
+info:
+  contact:
+    email: nikita_gopher@mail.ru
+    name: Никита Гоферович
+    url: https://nikita_gopher.by
+  description: Это приложение доставки GoGo(Быстро, качественно, выгодно)
+  title: Доставка GoGo
+  version: "1.0"
+paths:
+  /orders/{number}:
+    get:
+      description: Получение информации о заказе
+      parameters:
+      - description: Номер заказа
+        in: path
+        name: number
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.OrderDTO'
+        "400":
+          description: Неправильный номер
+          schema:
+            $ref: '#/definitions/domain.ErrorResponse'
+        "401":
+          description: Почта не найдена
+          schema:
+            $ref: '#/definitions/domain.ErrorResponse'
+        "404":
+          description: Заказ не найден
+          schema:
+            $ref: '#/definitions/domain.ErrorResponse'
+        "500":
+          description: Произошла ошибка на сервере
+          schema:
+            $ref: '#/definitions/domain.ErrorResponse'
+      security:
+      - Auth: []
+      summary: Get order
+      tags:
+      - orders
+  /orders/add/{number}:
+    post:
+      consumes:
+      - application/json
+      description: Добавление товаров в заказ
+      parameters:
+      - description: Номер заказа
+        in: path
+        name: number
+        required: true
+        type: integer
+      - description: Название блюда и ресторана
+        in: body
+        name: body
+        required: true
+        schema:
+          items:
+            $ref: '#/definitions/handler.ItemDTOUser'
+          type: array
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Неправильный номер
+          schema:
+            $ref: '#/definitions/domain.ErrorResponse'
+        "401":
+          description: Почта не найдена
+          schema:
+            $ref: '#/definitions/domain.ErrorResponse'
+        "404":
+          description: Заказ или блюдо не найдены
+          schema:
+            $ref: '#/definitions/domain.ErrorResponse'
+        "500":
+          description: Произошла ошибка на сервере
+          schema:
+            $ref: '#/definitions/domain.ErrorResponse'
+      security:
+      - Auth: []
+      summary: Add items to order
+      tags:
+      - orders
+  /orders/cancel/{number}:
+    patch:
+      description: Отмена заказа
+      parameters:
+      - description: Номер заказа
+        in: path
+        name: number
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Неправильный номер
+          schema:
+            $ref: '#/definitions/domain.ErrorResponse'
+        "401":
+          description: Почта не найдена
+          schema:
+            $ref: '#/definitions/domain.ErrorResponse'
+        "500":
+          description: Произошла ошибка на сервере
+          schema:
+            $ref: '#/definitions/domain.ErrorResponse'
+      security:
+      - Auth: []
+      summary: Cancel order
+      tags:
+      - orders
+  /orders/confirm/{number}:
+    post:
+      consumes:
+      - application/json
+      description: Подтверждение заказа
+      parameters:
+      - description: Номер заказа
+        in: path
+        name: number
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Неправильный номер
+          schema:
+            $ref: '#/definitions/domain.ErrorResponse'
+        "401":
+          description: Почта не найдена
+          schema:
+            $ref: '#/definitions/domain.ErrorResponse'
+        "404":
+          description: Заказ или пользователь не найден
+          schema:
+            $ref: '#/definitions/domain.ErrorResponse'
+        "500":
+          description: Произошла ошибка на сервере
+          schema:
+            $ref: '#/definitions/domain.ErrorResponse'
+      security:
+      - Auth: []
+      summary: Confirm order
+      tags:
+      - orders
+  /orders/create:
+    post:
+      consumes:
+      - application/json
+      description: Создание нового заказа
+      parameters:
+      - description: Почта и адрес
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handler.OrderDTO'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Заказ успешно создан
+          schema:
+            type: string
+        "400":
+          description: Неверные данные
+          schema:
+            $ref: '#/definitions/domain.ErrorResponse'
+        "401":
+          description: Почта не найдена
+          schema:
+            $ref: '#/definitions/domain.ErrorResponse'
+        "404":
+          description: Заказ не найден
+          schema:
+            $ref: '#/definitions/domain.ErrorResponse'
+        "500":
+          description: Произошла ошибка на сервере
+          schema:
+            $ref: '#/definitions/domain.ErrorResponse'
+      security:
+      - Auth: []
+      summary: Create order
+      tags:
+      - orders
+  /orders/deleteitems/{number}:
+    post:
+      consumes:
+      - application/json
+      description: Удаление товаров из заказа
+      parameters:
+      - description: Номер заказа
+        in: path
+        name: number
+        required: true
+        type: integer
+      - description: Название блюда и ресторана
+        in: body
+        name: body
+        required: true
+        schema:
+          items:
+            $ref: '#/definitions/handler.ItemDTOUser'
+          type: array
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Неправильный номер
+          schema:
+            $ref: '#/definitions/domain.ErrorResponse'
+        "401":
+          description: Почта не найдена
+          schema:
+            $ref: '#/definitions/domain.ErrorResponse'
+        "404":
+          description: Заказ или блюдо не найдены
+          schema:
+            $ref: '#/definitions/domain.ErrorResponse'
+        "500":
+          description: Произошла ошибка на сервере
+          schema:
+            $ref: '#/definitions/domain.ErrorResponse'
+      security:
+      - Auth: []
+      summary: Delete items from order
+      tags:
+      - orders
+  /orders/details/{number}:
+    get:
+      description: Получение подробной информации о заказе
+      parameters:
+      - description: Номер заказа
+        in: path
+        name: number
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/handler.ItemDTOUser'
+            type: array
+        "400":
+          description: Неправильный номер
+          schema:
+            $ref: '#/definitions/domain.ErrorResponse'
+        "401":
+          description: Почта не найдена
+          schema:
+            $ref: '#/definitions/domain.ErrorResponse'
+        "500":
+          description: Произошла ошибка на сервере
+          schema:
+            $ref: '#/definitions/domain.ErrorResponse'
+      security:
+      - Auth: []
+      summary: Get order details
+      tags:
+      - orders
+  /restaurants:
+    get:
+      description: Список ресторанов
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/handler.RestDTO'
+            type: array
+        "500":
+          description: Произошла ошибка на сервере
+          schema:
+            $ref: '#/definitions/domain.ErrorResponse'
+      summary: Restaurants list
+      tags:
+      - rest
+    post:
+      consumes:
+      - application/json
+      description: Добавление новых блюд в меню
+      parameters:
+      - description: Название блюда, ресторана, состав, время приготовления и цена
+        in: body
+        name: body
+        required: true
+        schema:
+          items:
+            $ref: '#/definitions/handler.ItemDTOAdmin'
+          type: array
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Блюда успешно добавлены
+        "400":
+          description: Неправильные входные данные
+          schema:
+            $ref: '#/definitions/domain.ErrorResponse'
+        "500":
+          description: Произошла ошибка на сервере
+          schema:
+            $ref: '#/definitions/domain.ErrorResponse'
+      security:
+      - Auth: []
+      summary: Add new items
+      tags:
+      - rest
+  /restaurants/{title}:
+    get:
+      description: Просмотр меню ресторана
+      parameters:
+      - description: Название ресторана
+        in: path
+        name: title
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/handler.ItemDTOAdmin'
+            type: array
+        "500":
+          description: Произошла ошибка на сервере
+          schema:
+            $ref: '#/definitions/domain.ErrorResponse'
+      summary: Restaurant menu
+      tags:
+      - rest
+  /restaurants/create:
+    post:
+      consumes:
+      - application/json
+      description: Создание нового ресторана
+      parameters:
+      - description: Название, адрес и рейтинг(опционально описание)
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handler.RestDTO'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Ресторан успешно создан
+          schema:
+            $ref: '#/definitions/handler.RestDTO'
+        "400":
+          description: Неправильные входные данные
+          schema:
+            $ref: '#/definitions/domain.ErrorResponse'
+        "500":
+          description: Произошла ошибка на сервере
+          schema:
+            $ref: '#/definitions/domain.ErrorResponse'
+      security:
+      - Auth: []
+      summary: Create restaurant
+      tags:
+      - rest
+  /restaurants/delete:
+    post:
+      consumes:
+      - application/json
+      description: Удаление блюд из меню
+      parameters:
+      - description: Названия блюд и ресторанов
+        in: body
+        name: body
+        required: true
+        schema:
+          items:
+            $ref: '#/definitions/handler.ItemDeleteDTO'
+          type: array
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Блюда успешно удалены
+        "400":
+          description: Неправильные входные данные
+          schema:
+            $ref: '#/definitions/domain.ErrorResponse'
+        "500":
+          description: Произошла ошибка на сервере
+          schema:
+            $ref: '#/definitions/domain.ErrorResponse'
+      security:
+      - Auth: []
+      summary: Delete items
+      tags:
+      - rest
+  /users:
+    get:
+      description: Информация о пользователе
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.UserDTO'
+        "401":
+          description: Почта не найдена
+          schema:
+            $ref: '#/definitions/domain.ErrorResponse'
+        "404":
+          description: Пользователь не найден
+          schema:
+            $ref: '#/definitions/domain.ErrorResponse'
+        "500":
+          description: Произошла ошибка на сервере
+          schema:
+            $ref: '#/definitions/domain.ErrorResponse'
+      security:
+      - Auth: []
+      summary: User info
+      tags:
+      - users
+  /users/all:
+    get:
+      description: Информация о всех пользователях
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/handler.UserDTO'
+            type: array
+        "500":
+          description: Произошла ошибка на сервере
+          schema:
+            $ref: '#/definitions/domain.ErrorResponse'
+      security:
+      - Auth: []
+      summary: All users info
+      tags:
+      - users
+  /users/login:
+    post:
+      consumes:
+      - application/json
+      description: Авторизация
+      parameters:
+      - description: Почта и пароль
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handler.UserAuth'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Ваш токен для прохождения авторизации
+          schema:
+            $ref: '#/definitions/handler.ResponseWithToken'
+        "400":
+          description: Неверные входные данные
+          schema:
+            $ref: '#/definitions/domain.ErrorResponse'
+        "500":
+          description: Произошла ошибка на сервере
+          schema:
+            $ref: '#/definitions/domain.ErrorResponse'
+      summary: Login
+      tags:
+      - users
+  /users/refresh:
+    get:
+      description: Обновление токенов
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Ваш новый токен для прохождения авторизации
+          schema:
+            $ref: '#/definitions/handler.ResponseWithToken'
+        "400":
+          description: Неверные входные данные
+          schema:
+            $ref: '#/definitions/domain.ErrorResponse'
+        "500":
+          description: Произошла ошибка на сервере
+          schema:
+            $ref: '#/definitions/domain.ErrorResponse'
+      summary: Refresh
+      tags:
+      - users
+  /users/register:
+    post:
+      consumes:
+      - application/json
+      description: Создание нового аккаунта
+      parameters:
+      - description: Имя, почта, пароль, роль и адрес
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handler.UserDTO'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Регистрация пройдена успешно
+          schema:
+            $ref: '#/definitions/handler.UserDTO'
+        "400":
+          description: Неверные входные данные
+          schema:
+            $ref: '#/definitions/domain.ErrorResponse'
+        "500":
+          description: Произошла ошибка на сервере
+          schema:
+            $ref: '#/definitions/domain.ErrorResponse'
+      summary: Register account
+      tags:
+      - users
+  /users/replenish:
+    patch:
+      consumes:
+      - application/json
+      description: Пополнение баланса
+      parameters:
+      - description: Сумма для пополнения
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handler.ReplenishDTO'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Баланс успешно пополнен
+          schema:
+            $ref: '#/definitions/handler.UserDTO'
+        "400":
+          description: Неверные входные данные
+          schema:
+            $ref: '#/definitions/domain.ErrorResponse'
+        "401":
+          description: Почта не найдена
+          schema:
+            $ref: '#/definitions/domain.ErrorResponse'
+        "404":
+          description: Пользователь не найден
+          schema:
+            $ref: '#/definitions/domain.ErrorResponse'
+        "500":
+          description: Произошла ошибка на сервере
+          schema:
+            $ref: '#/definitions/domain.ErrorResponse'
+      security:
+      - Auth: []
+      summary: Replenish balance
+      tags:
+      - users
+securityDefinitions:
+  Auth:
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

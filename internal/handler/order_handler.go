@@ -64,6 +64,19 @@ func ConvertItemToDTOUser(item *domain.Item) *ItemDTOUser {
 
 }
 
+// @Summary Create order
+// @Description Создание нового заказа
+// @Tags orders
+// @Router /orders/create [post]
+// @Accept json
+// @Produce json
+// @Param body body OrderDTO true "Почта и адрес"
+// @Success 201 {string} string "Заказ успешно создан"
+// @Failure 400 {object} domain.ErrorResponse "Неверные данные"
+// @Failure 401 {object} domain.ErrorResponse "Почта не найдена"
+// @Failure 404 {object} domain.ErrorResponse "Заказ не найден"
+// @Failure 500 {object} domain.ErrorResponse "Произошла ошибка на сервере"
+// @Security Auth
 func (h *OrderHandler) CreateOrder(c *gin.Context) {
 
 	slog.Info("Handler started \"CreateOrder\"")
@@ -76,31 +89,31 @@ func (h *OrderHandler) CreateOrder(c *gin.Context) {
 	value, exists := c.Get("email")
 	if !exists {
 		slog.Error("Handler \"ReplenishBalance\" email not found in context")
-		c.JSON(401, gin.H{"error": "Email not found"})
+		c.JSON(401, domain.ErrorResponse{Error: "Email not found"})
 		return
 	}
 	email, ok := value.(string)
 	if !ok {
 		slog.Error("Handler \"ReplenishBalance\" get error when parsing value in string")
-		c.JSON(500, gin.H{"error": "Something went wrong"})
+		c.JSON(500, domain.ErrorResponse{Error: "Something went wrong"})
 		return
 	}
 
 	dto := OrderDTO{}
 	if err := c.ShouldBindJSON(&dto); err != nil {
 		slog.Error(err.Error())
-		c.JSON(500, gin.H{"error": err.Error()})
+		c.JSON(500, domain.ErrorResponse{Error: err.Error()})
 		return
 	}
 
 	order, err := h.Service.CreateOrder(ctx, email, dto.Address)
 	if err != nil {
 		if errors.Is(err, domain.ErrInvalidAddress) || errors.Is(err, domain.ErrInvalidEmail) || errors.Is(err, domain.ErrWithInsert) {
-			c.JSON(400, gin.H{"error": err.Error()})
+			c.JSON(400, domain.ErrorResponse{Error: err.Error()})
 		} else if errors.Is(err, domain.ErrOrderNotFound) {
-			c.JSON(404, gin.H{"error": err.Error()})
+			c.JSON(404, domain.ErrorResponse{Error: err.Error()})
 		} else {
-			c.JSON(500, gin.H{"error": err.Error()})
+			c.JSON(500, domain.ErrorResponse{Error: err.Error()})
 		}
 		return
 	}
@@ -114,6 +127,20 @@ func (h *OrderHandler) CreateOrder(c *gin.Context) {
 
 }
 
+// @Summary Add items to order
+// @Description Добавление товаров в заказ
+// @Tags orders
+// @Router /orders/add/{number} [post]
+// @Accept json
+// @Produce json
+// @Param number path int true "Номер заказа"
+// @Param body body []ItemDTOUser true "Название блюда и ресторана"
+// @Success 200 "OK"
+// @Failure 400 {object} domain.ErrorResponse "Неправильный номер"
+// @Failure 401 {object} domain.ErrorResponse "Почта не найдена"
+// @Failure 404 {object} domain.ErrorResponse "Заказ или блюдо не найдены"
+// @Failure 500 {object} domain.ErrorResponse "Произошла ошибка на сервере"
+// @Security Auth
 func (h *OrderHandler) AddItemsToOrder(c *gin.Context) {
 
 	slog.Info("Handler started \"AddItemsToOrder\"")
@@ -122,20 +149,20 @@ func (h *OrderHandler) AddItemsToOrder(c *gin.Context) {
 	number, err := strconv.Atoi(number_string)
 	if err != nil || number <= 0 {
 		slog.Error("Handler \"AddItemsToOrder\" get invalid number")
-		c.JSON(400, gin.H{"error": "Get invalid number"})
+		c.JSON(400, domain.ErrorResponse{Error: "Get invalid number"})
 		return
 	}
 
 	value, exists := c.Get("email")
 	if !exists {
 		slog.Error("Handler \"ReplenishBalance\" email not found in context")
-		c.JSON(401, gin.H{"error": "Email not found"})
+		c.JSON(401, domain.ErrorResponse{Error: "Email not found"})
 		return
 	}
 	email, ok := value.(string)
 	if !ok {
 		slog.Error("Handler \"ReplenishBalance\" get error when parsing value in string")
-		c.JSON(500, gin.H{"error": "Something went wrong"})
+		c.JSON(500, domain.ErrorResponse{Error: "Something went wrong"})
 		return
 	}
 
@@ -147,7 +174,7 @@ func (h *OrderHandler) AddItemsToOrder(c *gin.Context) {
 	itemsDTO := []ItemDTOUser{}
 	if err := c.ShouldBindJSON(&itemsDTO); err != nil {
 		slog.Error("\"AddItemsToOrder\":%w", err)
-		c.JSON(500, gin.H{"error": err.Error()})
+		c.JSON(500, domain.ErrorResponse{Error: err.Error()})
 		return
 	}
 
@@ -155,11 +182,11 @@ func (h *OrderHandler) AddItemsToOrder(c *gin.Context) {
 
 		if err := h.Service.AddItemsToOrder(ctx, number, email, dto.Title, dto.RestTitle); err != nil {
 			if errors.Is(err, domain.ErrWithInsert) || errors.Is(err, domain.ErrWithUpdate) {
-				c.JSON(400, gin.H{"error": err.Error()})
+				c.JSON(400, domain.ErrorResponse{Error: err.Error()})
 			} else if errors.Is(err, domain.ErrItemNotFound) || errors.Is(err, domain.ErrOrderNotFound) {
-				c.JSON(404, gin.H{"error": err.Error()})
+				c.JSON(404, domain.ErrorResponse{Error: err.Error()})
 			} else {
-				c.JSON(500, gin.H{"error": err.Error()})
+				c.JSON(500, domain.ErrorResponse{Error: err.Error()})
 			}
 			return
 		}
@@ -175,6 +202,20 @@ func (h *OrderHandler) AddItemsToOrder(c *gin.Context) {
 
 }
 
+// @Summary Delete items from order
+// @Description Удаление товаров из заказа
+// @Tags orders
+// @Router /orders/deleteitems/{number} [post]
+// @Accept json
+// @Produce json
+// @Param number path int true "Номер заказа"
+// @Param body body []ItemDTOUser true "Название блюда и ресторана"
+// @Success 200 "OK"
+// @Failure 400 {object} domain.ErrorResponse "Неправильный номер"
+// @Failure 401 {object} domain.ErrorResponse "Почта не найдена"
+// @Failure 404 {object} domain.ErrorResponse "Заказ или блюдо не найдены"
+// @Failure 500 {object} domain.ErrorResponse "Произошла ошибка на сервере"
+// @Security Auth
 func (h *OrderHandler) DeleteItemsFromOrder(c *gin.Context) {
 
 	slog.Info("Handler started \"DeleteItemsFromOrder\"")
@@ -183,20 +224,20 @@ func (h *OrderHandler) DeleteItemsFromOrder(c *gin.Context) {
 	number, err := strconv.Atoi(number_string)
 	if err != nil || number <= 0 {
 		slog.Error("Handler \"DeleteItemsFromOrder\" get invalid number")
-		c.JSON(400, gin.H{"error": "Get invalid number"})
+		c.JSON(400, domain.ErrorResponse{Error: "Get invalid number"})
 		return
 	}
 
 	value, exists := c.Get("email")
 	if !exists {
 		slog.Error("Handler \"ReplenishBalance\" email not found in context")
-		c.JSON(401, gin.H{"error": "Email not found"})
+		c.JSON(401, domain.ErrorResponse{Error: "Email not found"})
 		return
 	}
 	email, ok := value.(string)
 	if !ok {
 		slog.Error("Handler \"ReplenishBalance\" get error when parsing value in string")
-		c.JSON(500, gin.H{"error": "Something went wrong"})
+		c.JSON(500, domain.ErrorResponse{Error: "Something went wrong"})
 		return
 	}
 
@@ -208,7 +249,7 @@ func (h *OrderHandler) DeleteItemsFromOrder(c *gin.Context) {
 	itemsDTO := []ItemDTOUser{}
 	if err := c.ShouldBindJSON(&itemsDTO); err != nil {
 		slog.Error("Handler \"DeleteItemsFromOrder\" get next error when parsing json:%w", err)
-		c.JSON(500, gin.H{"error": err.Error()})
+		c.JSON(500, domain.ErrorResponse{Error: err.Error()})
 		return
 	}
 
@@ -216,11 +257,11 @@ func (h *OrderHandler) DeleteItemsFromOrder(c *gin.Context) {
 
 		if err := h.Service.DeleteItemsFromOrder(ctx, number, email, dto.Title, dto.RestTitle); err != nil {
 			if errors.Is(err, domain.ErrWithUpdate) || errors.Is(err, domain.ErrWithDelete) {
-				c.JSON(400, gin.H{"error": err.Error()})
+				c.JSON(400, domain.ErrorResponse{Error: err.Error()})
 			} else if errors.Is(err, domain.ErrItemNotFound) || errors.Is(err, domain.ErrOrderNotFound) {
-				c.JSON(404, gin.H{"error": err.Error()})
+				c.JSON(404, domain.ErrorResponse{Error: err.Error()})
 			} else {
-				c.JSON(500, gin.H{"error": err.Error()})
+				c.JSON(500, domain.ErrorResponse{Error: err.Error()})
 			}
 			return
 		}
@@ -236,6 +277,17 @@ func (h *OrderHandler) DeleteItemsFromOrder(c *gin.Context) {
 
 }
 
+// @Summary Cancel order
+// @Description Отмена заказа
+// @Tags orders
+// @Router /orders/cancel/{number} [patch]
+// @Produce json
+// @Param number path int true "Номер заказа"
+// @Success 200 "OK"
+// @Failure 400 {object} domain.ErrorResponse "Неправильный номер"
+// @Failure 401 {object} domain.ErrorResponse "Почта не найдена"
+// @Failure 500 {object} domain.ErrorResponse "Произошла ошибка на сервере"
+// @Security Auth
 func (h *OrderHandler) CancelOrder(c *gin.Context) {
 
 	slog.Info("Handler started \"CancelOrder\"")
@@ -244,20 +296,20 @@ func (h *OrderHandler) CancelOrder(c *gin.Context) {
 	number, err := strconv.Atoi(number_string)
 	if err != nil || number <= 0 {
 		slog.Error("Haandler \"CancelOrder\"Get invalid number")
-		c.JSON(400, gin.H{"error": "Get invalid number"})
+		c.JSON(400, domain.ErrorResponse{Error: "Get invalid number"})
 		return
 	}
 
 	value, exists := c.Get("email")
 	if !exists {
 		slog.Error("Handler \"ReplenishBalance\" email not found in context")
-		c.JSON(401, gin.H{"error": "Email not found"})
+		c.JSON(401, domain.ErrorResponse{Error: "Email not found"})
 		return
 	}
 	email, ok := value.(string)
 	if !ok {
 		slog.Error("Handler \"ReplenishBalance\" get error when parsing value in string")
-		c.JSON(500, gin.H{"error": "Something went wrong"})
+		c.JSON(500, domain.ErrorResponse{Error: "Something went wrong"})
 		return
 	}
 
@@ -268,9 +320,9 @@ func (h *OrderHandler) CancelOrder(c *gin.Context) {
 
 	if err := h.Service.CancelOrder(ctx, number, email); err != nil {
 		if errors.Is(err, domain.ErrWithUpdate) {
-			c.JSON(400, gin.H{"error": err.Error()})
+			c.JSON(400, domain.ErrorResponse{Error: err.Error()})
 		} else {
-			c.JSON(500, gin.H{"error": err.Error()})
+			c.JSON(500, domain.ErrorResponse{Error: err.Error()})
 		}
 		return
 	}
@@ -284,6 +336,18 @@ func (h *OrderHandler) CancelOrder(c *gin.Context) {
 
 }
 
+// @Summary Get order
+// @Description Получение информации о заказе
+// @Tags orders
+// @Router /orders/{number} [get]
+// @Produce json
+// @Param number path int true "Номер заказа"
+// @Success 200 {object} OrderDTO "OK"
+// @Failure 400 {object} domain.ErrorResponse "Неправильный номер"
+// @Failure 401 {object} domain.ErrorResponse "Почта не найдена"
+// @Failure 404 {object} domain.ErrorResponse "Заказ не найден"
+// @Failure 500 {object} domain.ErrorResponse "Произошла ошибка на сервере"
+// @Security Auth
 func (h *OrderHandler) GetOrder(c *gin.Context) {
 
 	slog.Info("Handler started \"GetOrder\"")
@@ -292,20 +356,20 @@ func (h *OrderHandler) GetOrder(c *gin.Context) {
 	number, err := strconv.Atoi(number_string)
 	if err != nil {
 		slog.Error("Handler \"GetOrder\" get next error when convert number:%w", err)
-		c.JSON(400, gin.H{"error": domain.ErrInvalidNumber})
+		c.JSON(400, domain.ErrorResponse{Error: domain.ErrInvalidNumber.Error()})
 		return
 	}
 
 	value, exists := c.Get("email")
 	if !exists {
 		slog.Error("Handler \"ReplenishBalance\" email not found in context")
-		c.JSON(401, gin.H{"error": "Email not found"})
+		c.JSON(401, domain.ErrorResponse{Error: "Email not found"})
 		return
 	}
 	email, ok := value.(string)
 	if !ok {
 		slog.Error("Handler \"ReplenishBalance\" get error when parsing value in string")
-		c.JSON(500, gin.H{"error": "Something went wrong"})
+		c.JSON(500, domain.ErrorResponse{Error: "Something went wrong"})
 		return
 	}
 
@@ -317,9 +381,9 @@ func (h *OrderHandler) GetOrder(c *gin.Context) {
 	order, err := h.Service.GetOrder(ctx, number, email)
 	if err != nil {
 		if errors.Is(err, domain.ErrOrderNotFound) {
-			c.JSON(404, gin.H{"error": err.Error()})
+			c.JSON(404, domain.ErrorResponse{Error: err.Error()})
 		} else {
-			c.JSON(500, gin.H{"error": err.Error()})
+			c.JSON(500, domain.ErrorResponse{Error: err.Error()})
 		}
 		return
 	}
@@ -335,6 +399,17 @@ func (h *OrderHandler) GetOrder(c *gin.Context) {
 
 }
 
+// @Summary Get order details
+// @Description Получение подробной информации о заказе
+// @Tags orders
+// @Router /orders/details/{number} [get]
+// @Produce json
+// @Param number path int true "Номер заказа"
+// @Success 200 {array} ItemDTOUser "OK"
+// @Failure 400 {object} domain.ErrorResponse "Неправильный номер"
+// @Failure 401 {object} domain.ErrorResponse "Почта не найдена"
+// @Failure 500 {object} domain.ErrorResponse "Произошла ошибка на сервере"
+// @Security Auth
 func (h *OrderHandler) GetOrderDetails(c *gin.Context) {
 
 	slog.Info("Handler started \"GetOrderDetails\"")
@@ -343,20 +418,20 @@ func (h *OrderHandler) GetOrderDetails(c *gin.Context) {
 	number, err := strconv.Atoi(number_string)
 	if err != nil {
 		slog.Error("Handler \"GetOrderDetails\" Get next error when convert number:%w", err)
-		c.JSON(400, gin.H{"error": domain.ErrInvalidNumber})
+		c.JSON(400, domain.ErrorResponse{Error: domain.ErrInvalidNumber.Error()})
 		return
 	}
 
 	value, exists := c.Get("email")
 	if !exists {
 		slog.Error("Handler \"ReplenishBalance\" email not found in context")
-		c.JSON(401, gin.H{"error": "Email not found"})
+		c.JSON(401, domain.ErrorResponse{Error: "Email not found"})
 		return
 	}
 	email, ok := value.(string)
 	if !ok {
 		slog.Error("Handler \"ReplenishBalance\" get error when parsing value in string")
-		c.JSON(500, gin.H{"error": "Something went wrong"})
+		c.JSON(500, domain.ErrorResponse{Error: "Something went wrong"})
 		return
 	}
 
@@ -367,7 +442,7 @@ func (h *OrderHandler) GetOrderDetails(c *gin.Context) {
 
 	items, err := h.Service.GetOrderDetails(ctx, number, email)
 	if err != nil {
-		c.JSON(500, gin.H{"error": err.Error()})
+		c.JSON(500, domain.ErrorResponse{Error: err.Error()})
 		return
 	}
 
@@ -387,6 +462,19 @@ func (h *OrderHandler) GetOrderDetails(c *gin.Context) {
 
 }
 
+// @Summary Confirm order
+// @Description Подтверждение заказа
+// @Tags orders
+// @Router /orders/confirm/{number} [post]
+// @Accept json
+// @Produce json
+// @Param number path int true "Номер заказа"
+// @Success 200 "OK"
+// @Failure 400 {object} domain.ErrorResponse "Неправильный номер"
+// @Failure 401 {object} domain.ErrorResponse "Почта не найдена"
+// @Failure 404 {object} domain.ErrorResponse "Заказ или пользователь не найден"
+// @Failure 500 {object} domain.ErrorResponse "Произошла ошибка на сервере"
+// @Security Auth
 func (h *OrderHandler) ConfirmOrder(c *gin.Context) {
 
 	slog.Info("Handler started \"ConfirmOrder\"")
@@ -395,20 +483,20 @@ func (h *OrderHandler) ConfirmOrder(c *gin.Context) {
 	number, err := strconv.Atoi(number_string)
 	if err != nil {
 		slog.Error("Handler \"ConfirmOrder\" Get next error when convert number:%w", err)
-		c.JSON(400, gin.H{"error": "Get invalid number"})
+		c.JSON(400, domain.ErrorResponse{Error: "Get invalid number"})
 		return
 	}
 
 	value, exists := c.Get("email")
 	if !exists {
 		slog.Error("Handler \"ReplenishBalance\" email not found in context")
-		c.JSON(401, gin.H{"error": "Email not found"})
+		c.JSON(401, domain.ErrorResponse{Error: "Email not found"})
 		return
 	}
 	email, ok := value.(string)
 	if !ok {
 		slog.Error("Handler \"ReplenishBalance\" get error when parsing value in string")
-		c.JSON(500, gin.H{"error": "Something went wrong"})
+		c.JSON(500, domain.ErrorResponse{Error: "Something went wrong"})
 		return
 	}
 
@@ -419,11 +507,11 @@ func (h *OrderHandler) ConfirmOrder(c *gin.Context) {
 
 	if err := h.Service.ConfirmOrder(ctx, number, email); err != nil {
 		if errors.Is(err, domain.ErrWithUpdate) || errors.Is(err, domain.ErrStatusNotCreated) {
-			c.JSON(400, gin.H{"error": err.Error()})
+			c.JSON(400, domain.ErrorResponse{Error: err.Error()})
 		} else if errors.Is(err, domain.ErrOrderNotFound) || errors.Is(err, domain.ErrUserNotFound) {
-			c.JSON(404, gin.H{"error": err.Error()})
+			c.JSON(404, domain.ErrorResponse{Error: err.Error()})
 		} else {
-			c.JSON(500, gin.H{"error": err.Error()})
+			c.JSON(500, domain.ErrorResponse{Error: err.Error()})
 		}
 		return
 	}

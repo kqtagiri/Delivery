@@ -2,6 +2,10 @@ package domain
 
 import "errors"
 
+type ErrorResponse struct {
+	Error string `json:"error"`
+}
+
 var (
 	ErrInvalidRestaurantTitle = errors.New("Invalid restaurant title")
 	ErrInvalidComposition     = errors.New("Invalid composition")

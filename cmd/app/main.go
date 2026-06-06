@@ -19,6 +19,11 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt"
 	"github.com/redis/go-redis/v9"
+
+	_ "delivery/docs"
+
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 )
 
 func AuthMiddleware(role string) gin.HandlerFunc {
@@ -77,6 +82,18 @@ func AuthMiddleware(role string) gin.HandlerFunc {
 
 }
 
+// @title Доставка GoGo
+// @description Это приложение доставки GoGo(Быстро, качественно, выгодно)
+// @version 1.0
+// @host localhost:9111
+
+// @contact.name Никита Гоферович
+// @contact.email nikita_gopher@mail.ru
+// @contact.url https://nikita_gopher.by
+
+// @securityDefinitions.apikey Auth
+// @in header
+// @name Authorization
 func main() {
 
 	ctx := context.Context(context.Background())
@@ -144,16 +161,18 @@ func main() {
 		})
 	})
 
+	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+
 	rest := r.Group("/restaurants")
 	rest.POST("/create", AuthMiddleware(domain.AdminRole), rest_handler.CreateRestaurant) //admin
 	rest.GET("", rest_handler.RestaurantsList)
 	rest.GET("/:title", rest_handler.RestaurantMenu)
-	rest.POST("/:title", AuthMiddleware(domain.AdminRole), rest_handler.AddNewItems)   //admin
-	rest.DELETE("/:title", AuthMiddleware(domain.AdminRole), rest_handler.DeleteItems) //admin
+	rest.POST("", AuthMiddleware(domain.AdminRole), rest_handler.AddNewItems)        //admin
+	rest.POST("/delete", AuthMiddleware(domain.AdminRole), rest_handler.DeleteItems) //admin
 
 	users := r.Group("/users")
 	users.POST("/register", user_handler.RegisterAccount)
-	users.GET("/login", user_handler.Authorization)
+	users.POST("/login", user_handler.Authorization)
 	users.GET("/refresh", user_handler.Refresh)
 	users.PATCH("/replenish", AuthMiddleware(domain.UserRole), user_handler.ReplenishBalance) // user
 	users.GET("", AuthMiddleware(domain.UserRole), user_handler.UserInfo)                     //user
@@ -165,7 +184,7 @@ func main() {
 	order.POST("/create", order_handler.CreateOrder)                         //user
 	order.POST("/add/:number", order_handler.AddItemsToOrder)                //user
 	order.DELETE("/deleteitems/:number", order_handler.DeleteItemsFromOrder) //user
-	order.DELETE("/delete/:number", order_handler.CancelOrder)               //user
+	order.DELETE("/cancel/:number", order_handler.CancelOrder)               //user
 	order.GET("/:number", order_handler.GetOrder)                            //user
 	order.GET("/details/:number", order_handler.GetOrderDetails)             //user
 	order.POST("/confirm/:number", order_handler.ConfirmOrder)               //user
@@ -176,12 +195,10 @@ func main() {
 	}
 
 	go func() {
-
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			slog.Error(err.Error())
 			return
 		}
-
 	}()
 
 	quit := make(chan os.Signal, 1)
