@@ -5,7 +5,7 @@ services:
     env_file: 
       - .env
     environment:
-      CONN_STRING: ${CONN_STRING}
+      CONN_STRING: ${CONN_STRING_DOCKER}
       DB_HOST: database
       REDIS_HOST: redis:6379
     depends_on:

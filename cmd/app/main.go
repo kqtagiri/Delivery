@@ -126,31 +126,6 @@ func main() {
 	order_service := service.NewOrderService(order_repo)
 	order_handler := handler.NewOrderHandler(order_service)
 
-	if err := user_repo.CreateUserTable(); err != nil {
-		slog.Error("Get next error when create users table:", err)
-		return
-	}
-
-	if err := rest_repo.CreateMenuTable(); err != nil {
-		slog.Error("Get next error when create menu table:", err)
-		return
-	}
-
-	if err := rest_repo.CreateRestaurantTable(); err != nil {
-		slog.Error("Get next error when create restaurants table:", err)
-		return
-	}
-
-	if err := order_repo.CreateItemsInOrdersTable(); err != nil {
-		slog.Error("Get next error when create orders_items table:", err)
-		return
-	}
-
-	if err := order_repo.CreateOrderTable(); err != nil {
-		slog.Error("Get next error when create orders table:", err)
-		return
-	}
-
 	r := gin.Default()
 
 	r.GET("/ping", func(c *gin.Context) {
@@ -181,13 +156,13 @@ func main() {
 
 	order := r.Group("/orders")
 	order.Use(AuthMiddleware(domain.UserRole))
-	order.POST("/create", order_handler.CreateOrder)                         //user
-	order.POST("/add/:number", order_handler.AddItemsToOrder)                //user
-	order.DELETE("/deleteitems/:number", order_handler.DeleteItemsFromOrder) //user
-	order.DELETE("/cancel/:number", order_handler.CancelOrder)               //user
-	order.GET("/:number", order_handler.GetOrder)                            //user
-	order.GET("/details/:number", order_handler.GetOrderDetails)             //user
-	order.POST("/confirm/:number", order_handler.ConfirmOrder)               //user
+	order.POST("/create", order_handler.CreateOrder)                       //user
+	order.POST("/add/:number", order_handler.AddItemsToOrder)              //user
+	order.POST("/deleteitems/:number", order_handler.DeleteItemsFromOrder) //user
+	order.PATCH("/cancel/:number", order_handler.CancelOrder)              //user
+	order.GET("/:number", order_handler.GetOrder)                          //user
+	order.GET("/details/:number", order_handler.GetOrderDetails)           //user
+	order.POST("/confirm/:number", order_handler.ConfirmOrder)             //user
 
 	server := http.Server{
 		Addr:    ":9111",

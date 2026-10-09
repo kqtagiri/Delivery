@@ -10,5 +10,5 @@ start_docker:
 start_docker_debug:
 	@docker compose up --build
 
-end_docker:
+stop_docker:
 	@docker compose down

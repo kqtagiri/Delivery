@@ -82,50 +82,6 @@ func ConvertModelToItem(model *ItemModel) *domain.Item {
 
 }
 
-func (r *RestaurantRepositoryStruct) CreateRestaurantTable() error {
-
-	slog.Info("Start create restaurants table")
-
-	query := `CREATE TABLE IF NOT EXISTS restaurants(
-		id SERIAL PRIMARY KEY, 
-		title VARCHAR(100) NOT NULL,
-		description VARCHAR(300),
-		address VARCHAR(300) NOT NULL,
-		rating DECIMAL(3,2) NOT NULL,
-		UNIQUE(title, address)
-	);`
-
-	if _, err := r.DB.Conn.Exec(r.DB.Ctx, query); err != nil {
-		return err
-	}
-
-	slog.Info("Create restaurants table success")
-	return nil
-
-}
-
-func (r *RestaurantRepositoryStruct) CreateMenuTable() error {
-
-	slog.Info("Started create menu table")
-
-	query := `CREATE TABLE IF NOT EXISTS menu(
-		id SERIAL PRIMARY KEY,
-		title VARCHAR(100) NOT NULL,
-		rest_title VARCHAR(100) NOT NULL,
-		composition VARCHAR(300) NOT NULL,
-		time INT NOT NULL,
-		cost DECIMAL(9,2) NOT NULL
-	);`
-
-	if _, err := r.DB.Conn.Exec(r.DB.Ctx, query); err != nil {
-		return err
-	}
-
-	slog.Info("Create menu table success")
-	return nil
-
-}
-
 func (r *RestaurantRepositoryStruct) CreateRestaurant(ctx context.Context, rest *domain.Restaurant) error {
 
 	slog.Info("Repository started \"CreateRestaurant\"")

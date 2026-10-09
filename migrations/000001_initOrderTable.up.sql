@@ -1,0 +1,10 @@
+CREATE TABLE IF NOT EXISTS orders(
+	id SERIAL PRIMARY KEY,
+	number SERIAL,
+	email VARCHAR(100) NOT NULL,
+	address VARCHAR(300) NOT NULL,
+	status VARCHAR(15) NOT NULL,
+	time INT,
+	cost DECIMAL(9,2),
+	UNIQUE(email)
+);

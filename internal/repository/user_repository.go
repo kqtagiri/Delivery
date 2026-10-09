@@ -57,31 +57,6 @@ type UserRepository interface {
 	//UserHistoryInfo(ctx *context.Context, email string) error
 }
 
-func (r *UserRepositoryStruct) CreateUserTable() error {
-
-	slog.Info("Started create user table")
-
-	query := `CREATE TABLE IF NOT EXISTS users(
-		id SERIAL PRIMARY KEY,
-		name VARCHAR(50) NOT NULL,
-		email VARCHAR(50) NOT NULL,
-		password VARCHAR(32) NOT NULL,
-		role VARCHAR(5) NOT NULL,
-		address VARCHAR(200) NOT NULL,
-		balance DECIMAL(9,2),
-		UNIQUE(email)
-	);`
-
-	_, err := r.DB.Conn.Exec(r.DB.Ctx, query)
-	if err != nil {
-		return err
-	}
-
-	slog.Info("Create user table is success")
-	return nil
-
-}
-
 func (r *UserRepositoryStruct) RegisterAccount(ctx context.Context, u *domain.User) error {
 
 	slog.Info("Repository started \"RegisterAccount\"")

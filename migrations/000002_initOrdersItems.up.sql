@@ -1,0 +1,9 @@
+CREATE TABLE IF NOT EXISTS orders_items(
+	id SERIAL PRIMARY KEY,
+	number INT NOT NULL,
+	title VARCHAR(100) NOT NULL,
+	rest_title VARCHAR(100) NOT NULL,
+	composition VARCHAR(300) NOT NULL,
+	time INT NOT NULL,
+	cost DECIMAL(9,2) NOT NULL
+);

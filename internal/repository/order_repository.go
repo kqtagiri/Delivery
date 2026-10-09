@@ -58,53 +58,6 @@ func ConvertModelToOrder(model *OrderModel) *domain.Order {
 
 }
 
-func (r *OrderRepositoryStruct) CreateOrderTable() error {
-
-	slog.Info("Start create orders table")
-
-	query := `CREATE TABLE IF NOT EXISTS orders(
-		id SERIAL PRIMARY KEY,
-		number SERIAL,
-		email VARCHAR(100) NOT NULL,
-		address VARCHAR(300) NOT NULL,
-		status VARCHAR(15) NOT NULL,
-		time INT,
-		cost DECIMAL(9,2),
-		UNIQUE(email)
-	);`
-
-	if _, err := r.DB.Conn.Exec(r.DB.Ctx, query); err != nil {
-		return err
-	}
-
-	slog.Info("Create orders table success")
-	return nil
-
-}
-
-func (r *OrderRepositoryStruct) CreateItemsInOrdersTable() error {
-
-	slog.Info("Started create table to order items")
-
-	query := `CREATE TABLE IF NOT EXISTS orders_items(
-		id SERIAL PRIMARY KEY,
-		number INT NOT NULL,
-		title VARCHAR(100) NOT NULL,
-		rest_title VARCHAR(100) NOT NULL,
-		composition VARCHAR(300) NOT NULL,
-		time INT NOT NULL,
-		cost DECIMAL(9,2) NOT NULL
-	);`
-
-	if _, err := r.DB.Conn.Exec(r.DB.Ctx, query); err != nil {
-		return err
-	}
-
-	slog.Info("Create table to order items success")
-	return nil
-
-}
-
 func (r *OrderRepositoryStruct) CreateOrder(ctx context.Context, order *domain.Order) error {
 
 	slog.Info("Repository started \"CreateOrder\"")
