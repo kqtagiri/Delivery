@@ -26,7 +26,7 @@ func (s *OrderService) CreateOrder(ctx context.Context, email, address string) (
 
 	order, err := domain.NewOrder(email, address)
 	if err != nil {
-		slog.Error("Service \"CreateOrder\" get next error:", err)
+		slog.Error("Service \"CreateOrder\" get next error", "err", err.Error())
 		return nil, err
 	}
 
@@ -121,8 +121,8 @@ func (s *OrderService) ConfirmOrder(ctx context.Context, number int, email strin
 	}
 
 	if user.Balance < order.Cost {
-		slog.Error("Cost > Balance, user - ", email)
-		return errors.New("Don`t enough money on balance!")
+		slog.Error("Don't enough money on balance", "email", email)
+		return errors.New("don`t enough money on balance")
 	}
 
 	newBalance := user.Balance - order.Cost

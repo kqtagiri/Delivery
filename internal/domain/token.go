@@ -44,7 +44,7 @@ func NewToken(accessToken, refreshToken string) (*Tokens, error) {
 
 func GenerateTokens(id int, email, role string) (*Tokens, error) {
 
-	slog.Info("Started generate token to user:", email)
+	slog.Info("Started generate token to user", "email", email)
 
 	accessClaims := AccessTokenClaims{
 		UserId: id,
@@ -64,7 +64,7 @@ func GenerateTokens(id int, email, role string) (*Tokens, error) {
 	}
 	accessTokenStr, err := accessToken.SignedString([]byte(accessSecret))
 	if err != nil {
-		slog.Error("Get next error when signed access token to user:", email)
+		slog.Error("Get next error when signed access token to user", "email", email)
 		return nil, err
 	}
 
@@ -84,11 +84,11 @@ func GenerateTokens(id int, email, role string) (*Tokens, error) {
 	}
 	refreshTokenStr, err := refreshToken.SignedString([]byte(refreshSecret))
 	if err != nil {
-		slog.Error("Get next error when signed refresh token to user:", email)
+		slog.Error("Get next error when signed refresh token to user", "email", email)
 		return nil, err
 	}
 
-	slog.Info("Ended generate token to user:", email)
+	slog.Info("Ended generate token to user", "email", email)
 
 	return NewToken(accessTokenStr, refreshTokenStr)
 

@@ -26,7 +26,7 @@ func (s *RestaurantService) CreateRestaurant(ctx context.Context, title, desc, a
 
 	rest, err := domain.NewRestaurant(title, desc, addr, rating)
 	if err != nil {
-		slog.Info("Service \"CreateRestaurant\" get next error:", err.Error())
+		slog.Info("Service \"CreateRestaurant\" get next error", "err", err.Error())
 		return nil, err
 	}
 
@@ -73,7 +73,7 @@ func (s *RestaurantService) AddNewItems(ctx context.Context, title, restTitle, c
 
 	item, err := domain.NewItem(title, composition, restTitle, time, cost)
 	if err != nil {
-		slog.Info("Service \"AddNewItems\" get next error when create a new item:", err.Error())
+		slog.Info("Service \"AddNewItems\" get next error when create a new item", "err", err.Error())
 		return err
 	}
 

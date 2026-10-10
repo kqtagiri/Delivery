@@ -79,7 +79,7 @@ func (h *UserHandler) RegisterAccount(c *gin.Context) {
 
 	var req UserDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
-		slog.Error("Handler \"RegisterAccount\" get next error when parsing json:%w", err)
+		slog.Error("Handler \"RegisterAccount\" get next error when parsing json", "err", err.Error())
 		c.JSON(400, domain.ErrorResponse{Error: err.Error()})
 		return
 	}
@@ -126,7 +126,7 @@ func (h *UserHandler) Authorization(c *gin.Context) {
 
 	var auth UserAuth
 	if err := c.ShouldBindJSON(&auth); err != nil {
-		slog.Error("Handler \"Authorization\" get next error when parsing json:", err)
+		slog.Error("Handler \"Authorization\" get next error when parsing json", "err", err.Error())
 		c.JSON(400, domain.ErrorResponse{Error: err.Error()})
 		return
 	}
@@ -232,7 +232,7 @@ func (h *UserHandler) ReplenishBalance(c *gin.Context) {
 
 	var req ReplenishDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
-		slog.Error("Handler \"ReplenishBalance\" get next error when parsing json:%w", err)
+		slog.Error("Handler \"ReplenishBalance\" get next error when parsing json", "err", err.Error())
 		c.JSON(400, domain.ErrorResponse{Error: err.Error()})
 		return
 	}

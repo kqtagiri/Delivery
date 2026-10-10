@@ -29,7 +29,7 @@ func (s *UserService) RegisterAccount(ctx context.Context, name, email, password
 
 	user, err := domain.NewUser(name, email, password, role, address)
 	if err != nil {
-		slog.Error("Service \"RegisterAccount\" get next err:%w", err)
+		slog.Error("Service \"RegisterAccount\" get next error", "err", err.Error())
 		return nil, err
 	}
 
@@ -63,18 +63,18 @@ func (s *UserService) Refresh(ctx context.Context, refreshToken string) (*domain
 	claims := &domain.RefreshTokenClaims{}
 	token, err := jwt.ParseWithClaims(refreshToken, claims, func(t *jwt.Token) (interface{}, error) {
 		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, fmt.Errorf("Invalid singing method:%v", t.Header["alg"])
+			return nil, fmt.Errorf("invalid singing method:%v", t.Header["alg"])
 		}
 		return []byte(os.Getenv("REFRESH_SECRET_KEY")), nil
 	})
 
 	if err != nil {
-		slog.Error("Service \"Refresh\" get next error:", err)
+		slog.Error("Service \"Refresh\" get next error", "err", err)
 		return nil, err
 	}
 
 	if !token.Valid {
-		slog.Error("Service \"Refresh\" get next error:", domain.ErrInvalidRefreshToken)
+		slog.Error("Service \"Refresh\" get next error", "err", domain.ErrInvalidRefreshToken)
 		return nil, domain.ErrInvalidRefreshToken
 	}
 

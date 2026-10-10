@@ -67,13 +67,13 @@ func (r *UserRepositoryStruct) RegisterAccount(ctx context.Context, u *domain.Us
 	query := `INSERT INTO users (name, email, password, role, address, balance) VALUES ($1,$2,$3,$4,$5,$6);`
 	result, err := r.DB.Conn.Exec(ctx, query, u.Name, u.Email, u.Password, u.Role, u.Address, u.Balance)
 	if err != nil {
-		slog.Error("Repository \"RegisterAccount\" get next error:", err)
+		slog.Error("Repository \"RegisterAccount\" get next error", "err", err.Error())
 		return err
 	}
 
 	affected := result.RowsAffected()
 	if affected != 1 {
-		slog.Error("Repository \"RegisterAccount\" get next error:", domain.ErrWithInsert)
+		slog.Error("Repository \"RegisterAccount\" get next error", "err", domain.ErrWithInsert)
 		return domain.ErrWithInsert
 	}
 
@@ -89,7 +89,7 @@ func (r *UserRepositoryStruct) Authorization(ctx context.Context, email, passwor
 	query := `SELECT * FROM users WHERE email = $1 AND password = $2;`
 	var dto UserModel
 	if err := r.DB.Conn.QueryRow(ctx, query, email, password).Scan(&dto.Id, &dto.Name, &dto.Email, &dto.Password, &dto.Role, &dto.Address, &dto.Balance); err != nil {
-		slog.Error("Repository \"Authorization\" get next error:", err)
+		slog.Error("Repository \"Authorization\" get next error", "err", err.Error())
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, domain.ErrInvalidAuthorization
 		}
@@ -113,7 +113,7 @@ func (r *UserRepositoryStruct) Refresh(ctx context.Context, userId int) (*domain
 	var email, role string
 	query := `SELECT id, email, role FROM users WHERE id = $1;`
 	if err := r.DB.Conn.QueryRow(ctx, query, userId).Scan(&id, &email, &role); err != nil {
-		slog.Error("Repository \"Refresh\" get next error:", err.Error())
+		slog.Error("Repository \"Refresh\" get next error", "err", err.Error())
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, domain.ErrUserNotFound
 		}
@@ -188,7 +188,7 @@ func (r *UserRepositoryStruct) AllUsersInfo(ctx context.Context) (*[]domain.User
 	query := `SELECT * FROM users;`
 	rows, err := r.DB.Conn.Query(ctx, query)
 	if err != nil {
-		slog.Error("Repository \"AllUsersInfo\" get next error:", err)
+		slog.Error("Repository \"AllUsersInfo\" get next error", "err", err.Error())
 		return nil, err
 	}
 	defer rows.Close()
@@ -198,7 +198,7 @@ func (r *UserRepositoryStruct) AllUsersInfo(ctx context.Context) (*[]domain.User
 	for rows.Next() {
 
 		if err := rows.Scan(&model.Id, &model.Name, &model.Email, &model.Password, &model.Role, &model.Address, &model.Balance); err != nil {
-			slog.Error("Repository \"AllUsersInfo\" get next error:", err)
+			slog.Error("Repository \"AllUsersInfo\" get next error", "err", err.Error())
 			return nil, err
 		}
 
@@ -207,7 +207,7 @@ func (r *UserRepositoryStruct) AllUsersInfo(ctx context.Context) (*[]domain.User
 	}
 
 	if err := rows.Err(); err != nil {
-		slog.Error("Repository \"AllUsersInfo\" get next error:", err)
+		slog.Error("Repository \"AllUsersInfo\" get next error", "err", err.Error())
 		return nil, err
 	}
 

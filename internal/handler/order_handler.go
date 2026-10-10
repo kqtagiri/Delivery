@@ -173,7 +173,7 @@ func (h *OrderHandler) AddItemsToOrder(c *gin.Context) {
 
 	itemsDTO := []ItemDTOUser{}
 	if err := c.ShouldBindJSON(&itemsDTO); err != nil {
-		slog.Error("\"AddItemsToOrder\":%w", err)
+		slog.Error("\"AddItemsToOrder\"", "err", err.Error())
 		c.JSON(500, domain.ErrorResponse{Error: err.Error()})
 		return
 	}
@@ -248,7 +248,7 @@ func (h *OrderHandler) DeleteItemsFromOrder(c *gin.Context) {
 
 	itemsDTO := []ItemDTOUser{}
 	if err := c.ShouldBindJSON(&itemsDTO); err != nil {
-		slog.Error("Handler \"DeleteItemsFromOrder\" get next error when parsing json:%w", err)
+		slog.Error("Handler \"DeleteItemsFromOrder\" get next error when parsing json", "err", err.Error())
 		c.JSON(500, domain.ErrorResponse{Error: err.Error()})
 		return
 	}
@@ -355,7 +355,7 @@ func (h *OrderHandler) GetOrder(c *gin.Context) {
 	number_string := c.Param("number")
 	number, err := strconv.Atoi(number_string)
 	if err != nil {
-		slog.Error("Handler \"GetOrder\" get next error when convert number:%w", err)
+		slog.Error("Handler \"GetOrder\" get next error when convert number", "err", err.Error())
 		c.JSON(400, domain.ErrorResponse{Error: domain.ErrInvalidNumber.Error()})
 		return
 	}
@@ -417,7 +417,7 @@ func (h *OrderHandler) GetOrderDetails(c *gin.Context) {
 	number_string := c.Param("number")
 	number, err := strconv.Atoi(number_string)
 	if err != nil {
-		slog.Error("Handler \"GetOrderDetails\" Get next error when convert number:%w", err)
+		slog.Error("Handler \"GetOrderDetails\" Get next error when convert number", "err", err.Error())
 		c.JSON(400, domain.ErrorResponse{Error: domain.ErrInvalidNumber.Error()})
 		return
 	}
@@ -482,7 +482,7 @@ func (h *OrderHandler) ConfirmOrder(c *gin.Context) {
 	number_string := c.Param("number")
 	number, err := strconv.Atoi(number_string)
 	if err != nil {
-		slog.Error("Handler \"ConfirmOrder\" Get next error when convert number:%w", err)
+		slog.Error("Handler \"ConfirmOrder\" Get next error when convert number", "err", err.Error())
 		c.JSON(400, domain.ErrorResponse{Error: "Get invalid number"})
 		return
 	}

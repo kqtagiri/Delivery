@@ -49,13 +49,13 @@ func AuthMiddleware(role string) gin.HandlerFunc {
 		claims := &domain.AccessTokenClaims{}
 		token, err := jwt.ParseWithClaims(tokenStr, claims, func(token *jwt.Token) (interface{}, error) {
 			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-				return nil, fmt.Errorf("Invalid singing method:%v", token.Header["alg"])
+				return nil, fmt.Errorf("invalid singing method:%v", token.Header["alg"])
 			}
 			return []byte(os.Getenv("ACCESS_SECRET_KEY")), nil
 		})
 
 		if err != nil {
-			slog.Error("AuthMiddleware get next error:", err)
+			slog.Error("AuthMiddleware get next error", "err", err.Error())
 			c.JSON(500, gin.H{"error": err})
 			c.Abort()
 			return
@@ -99,7 +99,7 @@ func main() {
 	ctx := context.Context(context.Background())
 	db, err := database.NewDB(ctx)
 	if err != nil {
-		slog.Error("Get next err when connect to database:", err)
+		slog.Error("Get next err when connect to database", "err", err.Error())
 		return
 	}
 
@@ -112,7 +112,13 @@ func main() {
 		Password: "",
 		DB:       0,
 	})
-	defer rdb.Close()
+	defer func() {
+
+		if err := rdb.Close(); err != nil {
+			slog.Error("Error closing redis connection", "err", err.Error())
+		}
+
+	}()
 
 	user_repo := repository.NewUserRepositoryStruct(db)
 	user_service := service.NewUserService(user_repo)

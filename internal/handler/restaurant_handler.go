@@ -211,7 +211,7 @@ func (h *RestaurantHandler) AddNewItems(c *gin.Context) {
 
 	itemsDTO := []ItemDTOAdmin{}
 	if err := c.ShouldBindJSON(&itemsDTO); err != nil {
-		slog.Error("Handler \"AddNewItems\" get next error when parsing json:", err.Error())
+		slog.Error("Handler \"AddNewItems\" get next error when parsing json", "err", err.Error())
 		c.JSON(400, domain.ErrorResponse{Error: err.Error()})
 		return
 	}
@@ -260,7 +260,7 @@ func (h *RestaurantHandler) DeleteItems(c *gin.Context) {
 
 	itemsDTO := []ItemDeleteDTO{}
 	if err := c.ShouldBindJSON(&itemsDTO); err != nil {
-		slog.Error("Handler \"DeleteItems\" get next error when parsing json:", err.Error())
+		slog.Error("Handler \"DeleteItems\" get next error when parsing json", "err", err.Error())
 		c.JSON(500, domain.ErrorResponse{Error: err.Error()})
 		return
 	}
