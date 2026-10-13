@@ -1,5 +1,7 @@
 # 🍕 Delivery Service API
 
+[![CI](https://github.com/kqtagiri/Delivery/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/kqtagiri/Delivery/actions/workflows/ci.yml)
+
 Бэкенд для сервиса доставки еды. Управление ресторанами, заказами и балансом пользователей.
 
 ![Go Version](https://img.shields.io/badge/Go-1.26.1-00ADD8?style=flat&logo=go)
