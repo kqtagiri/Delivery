@@ -147,9 +147,9 @@ func main() {
 	rest := r.Group("/restaurants")
 	rest.POST("/create", AuthMiddleware(domain.AdminRole), rest_handler.CreateRestaurant) //admin
 	rest.GET("", rest_handler.RestaurantsList)
-	rest.GET("/:title", rest_handler.RestaurantMenu)
-	rest.POST("", AuthMiddleware(domain.AdminRole), rest_handler.AddNewItems)        //admin
-	rest.POST("/delete", AuthMiddleware(domain.AdminRole), rest_handler.DeleteItems) //admin
+	rest.GET("/:id/menu", rest_handler.RestaurantMenu)
+	rest.POST("/:id", AuthMiddleware(domain.AdminRole), rest_handler.AddNewItems)        //admin
+	rest.POST("/:id/delete", AuthMiddleware(domain.AdminRole), rest_handler.DeleteItems) //admin
 
 	users := r.Group("/users")
 	users.POST("/register", user_handler.RegisterAccount)
