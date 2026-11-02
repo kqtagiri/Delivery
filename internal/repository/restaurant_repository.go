@@ -8,7 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"sync"
+	"strconv"
 	"time"
 
 	"github.com/redis/go-redis/v9"
@@ -20,14 +20,13 @@ var (
 
 type RestaurantRepository interface {
 	CreateRestaurant(ctx context.Context, rest *domain.Restaurant) error
-	RestaurantsList(ctx context.Context) (*[]domain.Restaurant, error)
-	RestaurantMenu(ctx context.Context, title string) (*[]domain.Item, error)
-	AddNewItems(ctx context.Context, item *domain.Item) error
-	DeleteItems(ctx context.Context, title, restTitle string) error
+	RestaurantsList(ctx context.Context) ([]domain.Restaurant, error)
+	RestaurantMenu(ctx context.Context, restID int) ([]domain.Item, error)
+	AddNewItems(ctx context.Context, restID int, item *domain.Item) error
+	DeleteItems(ctx context.Context, restID int, title string) error
 }
 
 type RestaurantRepositoryStruct struct {
-	Mtx sync.RWMutex
 	DB  *database.DB
 	RDB *redis.Client
 }
@@ -35,7 +34,6 @@ type RestaurantRepositoryStruct struct {
 func NewRestaurantRepositoryStruct(db *database.DB, rdb *redis.Client) *RestaurantRepositoryStruct {
 
 	return &RestaurantRepositoryStruct{
-		Mtx: sync.RWMutex{},
 		DB:  db,
 		RDB: rdb,
 	}
@@ -43,7 +41,7 @@ func NewRestaurantRepositoryStruct(db *database.DB, rdb *redis.Client) *Restaura
 }
 
 type RestModel struct {
-	Id          int
+	ID          int
 	Title       string
 	Description string
 	Address     string
@@ -53,6 +51,7 @@ type RestModel struct {
 func ConvertModelToRest(model *RestModel) *domain.Restaurant {
 
 	return &domain.Restaurant{
+		ID:          model.ID,
 		Title:       model.Title,
 		Description: model.Description,
 		Address:     model.Address,
@@ -62,9 +61,9 @@ func ConvertModelToRest(model *RestModel) *domain.Restaurant {
 }
 
 type ItemModel struct {
-	Id          int
+	ID          int
+	RestID      int
 	Title       string
-	RestTitle   string
 	Composition string
 	Time        int
 	Cost        float64
@@ -73,8 +72,9 @@ type ItemModel struct {
 func ConvertModelToItem(model *ItemModel) *domain.Item {
 
 	return &domain.Item{
+		ID:          model.ID,
+		RestID:      model.RestID,
 		Title:       model.Title,
-		RestTitle:   model.RestTitle,
 		Composition: model.Composition,
 		Time:        model.Time,
 		Cost:        model.Cost,
@@ -83,11 +83,6 @@ func ConvertModelToItem(model *ItemModel) *domain.Item {
 }
 
 func (r *RestaurantRepositoryStruct) CreateRestaurant(ctx context.Context, rest *domain.Restaurant) error {
-
-	slog.Info("Repository started \"CreateRestaurant\"")
-
-	r.Mtx.Lock()
-	defer r.Mtx.Unlock()
 
 	query := `INSERT INTO restaurants (title, description, address, rating) VALUES($1,$2,$3,$4);`
 	result, err := r.DB.Conn.Exec(ctx, query, rest.Title, rest.Description, rest.Address, rest.Rating)
@@ -102,17 +97,11 @@ func (r *RestaurantRepositoryStruct) CreateRestaurant(ctx context.Context, rest 
 		return domain.ErrWithInsert
 	}
 
-	slog.Info("Repository ended \"CreateRestaurant\" success")
 	return nil
 
 }
 
-func (r *RestaurantRepositoryStruct) RestaurantsList(ctx context.Context) (*[]domain.Restaurant, error) {
-
-	slog.Info("Repository started \"RestaurantsList\"")
-
-	r.Mtx.RLock()
-	defer r.Mtx.RUnlock()
+func (r *RestaurantRepositoryStruct) RestaurantsList(ctx context.Context) ([]domain.Restaurant, error) {
 
 	data, err := r.RDB.Get(ctx, "restaurants_list").Result()
 	if err != nil && err != redis.Nil {
@@ -123,7 +112,7 @@ func (r *RestaurantRepositoryStruct) RestaurantsList(ctx context.Context) (*[]do
 			slog.Warn("Repository \"RestaurantsList\" get next error when parsing json in struct", "err", err.Error())
 		} else {
 			slog.Info("Repository ended \"RestaurantsList\" by redis")
-			return &rests, nil
+			return rests, nil
 		}
 	}
 
@@ -139,7 +128,7 @@ func (r *RestaurantRepositoryStruct) RestaurantsList(ctx context.Context) (*[]do
 	for rows.Next() {
 
 		var model RestModel
-		if err := rows.Scan(&model.Id, &model.Title, &model.Description, &model.Address, &model.Rating); err != nil {
+		if err := rows.Scan(&model.ID, &model.Title, &model.Description, &model.Address, &model.Rating); err != nil {
 			slog.Error("Scan failed", "err", err)
 			return nil, err
 		}
@@ -162,19 +151,13 @@ func (r *RestaurantRepositoryStruct) RestaurantsList(ctx context.Context) (*[]do
 		}
 	}
 
-	slog.Info("Repository ended \"RestaurantsList\" success")
-	return &rests, nil
+	return rests, nil
 
 }
 
-func (r *RestaurantRepositoryStruct) RestaurantMenu(ctx context.Context, title string) (*[]domain.Item, error) {
+func (r *RestaurantRepositoryStruct) RestaurantMenu(ctx context.Context, restID int) ([]domain.Item, error) {
 
-	slog.Info(fmt.Sprintf("Repository started \"RestaurantMenu\" from %s", title))
-
-	r.Mtx.RLock()
-	defer r.Mtx.RUnlock()
-
-	key := fmt.Sprint("restaurant_menu:" + title)
+	key := fmt.Sprint("restaurant_menu:" + strconv.Itoa(restID))
 	data, err := r.RDB.Get(ctx, key).Result()
 	if err != nil && err != redis.Nil {
 		slog.Warn("Repository \"RestaurantMenu\" get next error when get menu from redis", "err", err.Error())
@@ -183,15 +166,15 @@ func (r *RestaurantRepositoryStruct) RestaurantMenu(ctx context.Context, title s
 		if err := json.Unmarshal([]byte(data), &menu); err != nil {
 			slog.Warn("Repository \"RestaurantMenu\" get next error when parsing json in struct", "err", err.Error())
 		} else {
-			slog.Info(fmt.Sprintf("Repository ended \"RestaurantMenu\" from %s by redis:", title))
-			return &menu, nil
+			slog.Info(fmt.Sprintf("Repository ended \"RestaurantMenu\" from %d by redis:", restID))
+			return menu, nil
 		}
 	}
 
-	query := `SELECT * FROM menu WHERE rest_title = $1;`
-	rows, err := r.DB.Conn.Query(ctx, query, title)
+	query := `SELECT * FROM menu WHERE rest_id = $1;`
+	rows, err := r.DB.Conn.Query(ctx, query, restID)
 	if err != nil {
-		slog.Error("Repository \"RestaurantMenu\" get next error", "title", title, "err", err.Error())
+		slog.Error("Repository \"RestaurantMenu\" get next error", "id", restID, "err", err.Error())
 		return nil, err
 	}
 	defer rows.Close()
@@ -200,7 +183,7 @@ func (r *RestaurantRepositoryStruct) RestaurantMenu(ctx context.Context, title s
 	items := []domain.Item{}
 	for rows.Next() {
 
-		if err := rows.Scan(&model.Id, &model.Title, &model.RestTitle, &model.Composition, &model.Time, &model.Cost); err != nil {
+		if err := rows.Scan(&model.ID, &model.RestID, &model.Title, &model.Composition, &model.Time, &model.Cost); err != nil {
 			slog.Error("Scan failed", "err", err)
 			return nil, err
 		}
@@ -221,20 +204,14 @@ func (r *RestaurantRepositoryStruct) RestaurantMenu(ctx context.Context, title s
 		r.RDB.Set(ctx, key, data2, time.Second*60*15)
 	}
 
-	slog.Info(fmt.Sprintf("Repository ended \"RestaurantMenu\" from %s success", title))
-	return &items, nil
+	return items, nil
 
 }
 
-func (r *RestaurantRepositoryStruct) AddNewItems(ctx context.Context, item *domain.Item) error {
+func (r *RestaurantRepositoryStruct) AddNewItems(ctx context.Context, restID int, item *domain.Item) error {
 
-	slog.Info("Repository started \"AddNewItems\"")
-
-	r.Mtx.Lock()
-	defer r.Mtx.Unlock()
-
-	query := `INSERT INTO menu(title, rest_title, composition, time, cost) VALUES($1,$2,$3,$4,$5);`
-	result, err := r.DB.Conn.Exec(ctx, query, item.Title, item.RestTitle, item.Composition, item.Time, item.Cost)
+	query := `INSERT INTO menu(rest_id, title, composition, time, cost) VALUES($1,$2,$3,$4,$5);`
+	result, err := r.DB.Conn.Exec(ctx, query, restID, item.Title, item.Composition, item.Time, item.Cost)
 	if err != nil {
 		slog.Error("Repository \"AddNewItems\" get next error", "err", err.Error())
 		return err
@@ -246,25 +223,19 @@ func (r *RestaurantRepositoryStruct) AddNewItems(ctx context.Context, item *doma
 		return domain.ErrWithInsert
 	}
 
-	key := fmt.Sprint("restaurant_menu:" + item.RestTitle)
+	key := fmt.Sprint("restaurant_menu:" + strconv.Itoa(restID))
 	if err := r.RDB.Del(ctx, key).Err(); err != nil {
 		slog.Warn("Get next error when delete data from redis", "err", err.Error())
 	}
 
-	slog.Info("Repository ended \"AddNewItems\" success")
 	return nil
 
 }
 
-func (r *RestaurantRepositoryStruct) DeleteItems(ctx context.Context, title, restTitle string) error {
+func (r *RestaurantRepositoryStruct) DeleteItems(ctx context.Context, restID int, title string) error {
 
-	slog.Info("Repository started \"DeleteItems\"")
-
-	r.Mtx.Lock()
-	defer r.Mtx.Unlock()
-
-	query := `DELETE FROM menu WHERE title = $1 AND rest_title = $2;`
-	result, err := r.DB.Conn.Exec(ctx, query, title, restTitle)
+	query := `DELETE FROM menu WHERE rest_id = $1 AND title = $2;`
+	result, err := r.DB.Conn.Exec(ctx, query, restID, title)
 	if err != nil {
 		slog.Error("Repository \"DeleteItems\" get next error", "err", err.Error())
 		return err
@@ -276,12 +247,11 @@ func (r *RestaurantRepositoryStruct) DeleteItems(ctx context.Context, title, res
 		return domain.ErrWithDelete
 	}
 
-	key := fmt.Sprint("restaurant_menu:" + restTitle)
+	key := fmt.Sprint("restaurant_menu:" + strconv.Itoa(restID))
 	if err := r.RDB.Del(ctx, key).Err(); err != nil {
 		slog.Warn("Get next error when delete data from redis", "err", err.Error())
 	}
 
-	slog.Info("Repository ended \"DeleteItems\" success")
 	return nil
 
 }

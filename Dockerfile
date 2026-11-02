@@ -8,4 +8,5 @@ RUN CGO_ENABLED=0 GOOS=linux go build -o /build/exe ./cmd/app/main.go
 FROM alpine:3.20
 WORKDIR /Delivery
 COPY --from=build /build/exe .
+COPY --from=build /build/docs ./docs
 CMD ["/Delivery/exe"]

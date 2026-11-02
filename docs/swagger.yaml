@@ -4,14 +4,12 @@ definitions:
       error:
         type: string
     type: object
-  handler.ItemDTOAdmin:
+  handler.ItemDTOAdminRequest:
     properties:
       composition:
         type: string
       cost:
         type: number
-      rest_title:
-        type: string
       time:
         type: integer
       title:
@@ -19,32 +17,56 @@ definitions:
     required:
     - composition
     - cost
-    - rest_title
     - time
     - title
     type: object
-  handler.ItemDTOUser:
+  handler.ItemDTOAdminResponse:
     properties:
+      composition:
+        type: string
       cost:
         type: number
-      rest_title:
-        type: string
+      id:
+        type: integer
+      rest_id:
+        type: integer
       time:
         type: integer
       title:
         type: string
-    required:
-    - rest_title
-    - title
     type: object
-  handler.ItemDeleteDTO:
+  handler.ItemDTOUserRequest:
     properties:
+      menu_id:
+        type: integer
+    required:
+    - menu_id
+    type: object
+  handler.ItemDTOUserResponse:
+    properties:
+      composition:
+        type: string
+      cost:
+        type: number
+      id:
+        type: integer
+      menu_id:
+        type: integer
+      number:
+        type: integer
       rest_title:
         type: string
       title:
         type: string
+    type: object
+  handler.ItemDeleteDTO:
+    properties:
+      rest_id:
+        type: integer
+      title:
+        type: string
     required:
-    - rest_title
+    - rest_id
     - title
     type: object
   handler.OrderDTO:
@@ -55,6 +77,8 @@ definitions:
         type: number
       email:
         type: string
+      id:
+        type: integer
       number:
         type: integer
       status:
@@ -82,6 +106,8 @@ definitions:
         type: string
       description:
         type: string
+      id:
+        type: integer
       rating:
         type: number
       title:
@@ -109,6 +135,8 @@ definitions:
         type: number
       email:
         type: string
+      id:
+        type: integer
       name:
         type: string
       password:
@@ -180,13 +208,13 @@ paths:
         name: number
         required: true
         type: integer
-      - description: Название блюда и ресторана
+      - description: Айди меню
         in: body
         name: body
         required: true
         schema:
           items:
-            $ref: '#/definitions/handler.ItemDTOUser'
+            $ref: '#/definitions/handler.ItemDTOUserRequest'
           type: array
       produces:
       - application/json
@@ -333,13 +361,13 @@ paths:
         name: number
         required: true
         type: integer
-      - description: Название блюда и ресторана
+      - description: Айди меню
         in: body
         name: body
         required: true
         schema:
           items:
-            $ref: '#/definitions/handler.ItemDTOUser'
+            $ref: '#/definitions/handler.ItemDTOUserRequest'
           type: array
       produces:
       - application/json
@@ -383,7 +411,7 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/handler.ItemDTOUser'
+              $ref: '#/definitions/handler.ItemDTOUserResponse'
             type: array
         "400":
           description: Неправильный номер
@@ -421,21 +449,20 @@ paths:
       summary: Restaurants list
       tags:
       - rest
+  /restaurants/{id}:
     post:
       consumes:
       - application/json
       description: Добавление новых блюд в меню
       parameters:
-      - description: Название блюда, ресторана, состав, время приготовления и цена
+      - description: Название блюда, состав, время приготовления и цена
         in: body
         name: body
         required: true
         schema:
           items:
-            $ref: '#/definitions/handler.ItemDTOAdmin'
+            $ref: '#/definitions/handler.ItemDTOAdminRequest'
           type: array
-      produces:
-      - application/json
       responses:
         "201":
           description: Блюда успешно добавлены
@@ -452,15 +479,15 @@ paths:
       summary: Add new items
       tags:
       - rest
-  /restaurants/{title}:
+  /restaurants/{id}/menu:
     get:
       description: Просмотр меню ресторана
       parameters:
-      - description: Название ресторана
+      - description: ID ресторана
         in: path
-        name: title
+        name: id
         required: true
-        type: string
+        type: integer
       produces:
       - application/json
       responses:
@@ -468,7 +495,7 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/handler.ItemDTOAdmin'
+              $ref: '#/definitions/handler.ItemDTOAdminResponse'
             type: array
         "500":
           description: Произошла ошибка на сервере
@@ -515,7 +542,7 @@ paths:
       - application/json
       description: Удаление блюд из меню
       parameters:
-      - description: Названия блюд и ресторанов
+      - description: ID ресторанов и название блюд
         in: body
         name: body
         required: true
@@ -523,8 +550,6 @@ paths:
           items:
             $ref: '#/definitions/handler.ItemDeleteDTO'
           type: array
-      produces:
-      - application/json
       responses:
         "200":
           description: Блюда успешно удалены

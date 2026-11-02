@@ -1,13 +1,13 @@
 package domain
 
 type Order struct {
+	ID      int
 	Number  int
 	Email   string
 	Address string
 	Status  string //created, confirmed
 	Time    int    //(min)
 	Cost    float64
-	Check   map[Item]int //restaurant_title: item1: kolvo; item2: kolvo...
 }
 
 func NewOrder(email, address string) (*Order, error) {
@@ -27,7 +27,16 @@ func NewOrder(email, address string) (*Order, error) {
 		Status:  StatusCreated,
 		Time:    0,
 		Cost:    0,
-		Check:   make(map[Item]int),
 	}, nil
 
+}
+
+type OrderItem struct {
+	ID          int     `json:"id"`
+	Number      int     `json:"number"`
+	MenuID      int     `json:"menu_id"`
+	Title       string  `json:"title"`
+	RestTitle   string  `json:"rest_title"`
+	Composition string  `json:"composition"`
+	Cost        float64 `json:"cost"`
 }

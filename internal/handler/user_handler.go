@@ -12,6 +12,7 @@ import (
 )
 
 type UserDTO struct {
+	ID       int     `json:"id"`
 	Name     string  `json:"name" binding:"required"`
 	Email    string  `json:"email" binding:"required,email"`
 	Password string  `json:"password" binding:"required"`
@@ -23,6 +24,7 @@ type UserDTO struct {
 func ConvertUserToDTO(user *domain.User) *UserDTO {
 
 	return &UserDTO{
+		ID:       user.ID,
 		Name:     user.Name,
 		Email:    user.Email,
 		Password: user.Password,
@@ -70,8 +72,6 @@ func NewUserHandler(service *service.UserService) *UserHandler {
 // @Failure 500 {object} domain.ErrorResponse "Произошла ошибка на сервере"
 func (h *UserHandler) RegisterAccount(c *gin.Context) {
 
-	slog.Info("Handler started \"RegisterAccount\"")
-
 	ctx := c.Request.Context()
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
@@ -100,7 +100,6 @@ func (h *UserHandler) RegisterAccount(c *gin.Context) {
 
 	dto := ConvertUserToDTO(user)
 
-	slog.Info("Handler ended \"RegisterAccount\" success")
 	c.JSON(201, dto)
 
 }
@@ -116,8 +115,6 @@ func (h *UserHandler) RegisterAccount(c *gin.Context) {
 // @Failure 400 {object} domain.ErrorResponse "Неверные входные данные"
 // @Failure 500 {object} domain.ErrorResponse "Произошла ошибка на сервере"
 func (h *UserHandler) Authorization(c *gin.Context) {
-
-	slog.Info("Handler started \"Authorization\"")
 
 	ctx := c.Request.Context()
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
@@ -147,7 +144,6 @@ func (h *UserHandler) Authorization(c *gin.Context) {
 		slog.Warn("\"Authorization\" took a lot of time")
 	}
 
-	slog.Info("Handler ended \"Authorization\" success")
 	c.JSON(200, ResponseWithToken{AccessToken: tokens.AccessToken})
 
 }
@@ -161,8 +157,6 @@ func (h *UserHandler) Authorization(c *gin.Context) {
 // @Failure 400 {object} domain.ErrorResponse "Неверные входные данные"
 // @Failure 500 {object} domain.ErrorResponse "Произошла ошибка на сервере"
 func (h *UserHandler) Refresh(c *gin.Context) {
-
-	slog.Info("Handler started \"Refresh\"")
 
 	ctx := c.Request.Context()
 	ctx, cancel := context.WithTimeout(ctx, time.Second*5)
@@ -190,7 +184,6 @@ func (h *UserHandler) Refresh(c *gin.Context) {
 		slog.Warn("\"Refresh\" took a lot of time")
 	}
 
-	slog.Info("Handler ended \"Refresh\" success")
 	c.JSON(200, ResponseWithToken{AccessToken: tokens.AccessToken})
 
 }
@@ -209,8 +202,6 @@ func (h *UserHandler) Refresh(c *gin.Context) {
 // @Failure 500 {object} domain.ErrorResponse "Произошла ошибка на сервере"
 // @Security Auth
 func (h *UserHandler) ReplenishBalance(c *gin.Context) {
-
-	slog.Info("Handler started \"ReplenishBalance\"")
 
 	ctx := c.Request.Context()
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
@@ -255,7 +246,6 @@ func (h *UserHandler) ReplenishBalance(c *gin.Context) {
 
 	dto := ConvertUserToDTO(user)
 
-	slog.Info("Handler ended \"ReplenishBalance\" success")
 	c.JSON(200, dto)
 
 }
@@ -271,8 +261,6 @@ func (h *UserHandler) ReplenishBalance(c *gin.Context) {
 // @Failure 500 {object} domain.ErrorResponse "Произошла ошибка на сервере"
 // @Security Auth
 func (h *UserHandler) UserInfo(c *gin.Context) {
-
-	slog.Info("Handler started \"UserInfo\"")
 
 	ctx := c.Request.Context()
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
@@ -308,7 +296,6 @@ func (h *UserHandler) UserInfo(c *gin.Context) {
 
 	dto := ConvertUserToDTO(user)
 
-	slog.Info("Handler ended \"UserInfo\" success")
 	c.JSON(200, dto)
 
 }
@@ -323,8 +310,6 @@ func (h *UserHandler) UserInfo(c *gin.Context) {
 // @Security Auth
 func (h *UserHandler) AllUsersInfo(c *gin.Context) {
 
-	slog.Info("Handler started \"AllUsersInfo\"")
-
 	ctx := c.Request.Context()
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
@@ -337,7 +322,7 @@ func (h *UserHandler) AllUsersInfo(c *gin.Context) {
 	}
 
 	dtos := []UserDTO{}
-	for _, user := range *users {
+	for _, user := range users {
 
 		dtos = append(dtos, *ConvertUserToDTO(&user))
 
@@ -347,7 +332,6 @@ func (h *UserHandler) AllUsersInfo(c *gin.Context) {
 		slog.Warn("\"AllUsersInfo\" took a lot of time")
 	}
 
-	slog.Info("Handler ended \"AllUsersInfo\" success")
 	c.JSON(200, dtos)
 
 }

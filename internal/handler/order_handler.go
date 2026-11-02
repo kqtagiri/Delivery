@@ -25,6 +25,7 @@ func NewOrderHandler(service *service.OrderService) *OrderHandler {
 }
 
 type OrderDTO struct {
+	ID      int     `json:"id"`
 	Number  int     `json:"number"`
 	Email   string  `json:"email"`
 	Address string  `json:"address" binding:"required"`
@@ -33,16 +34,24 @@ type OrderDTO struct {
 	Cost    float64 `json:"cost"`
 }
 
-type ItemDTOUser struct {
-	Title     string  `json:"title" binding:"required"`
-	RestTitle string  `json:"rest_title" binding:"required"`
-	Time      int     `json:"time"`
-	Cost      float64 `json:"cost"`
+type ItemDTOUserRequest struct {
+	MenuID int `json:"menu_id" binding:"required"`
+}
+
+type ItemDTOUserResponse struct {
+	ID          int     `json:"id"`
+	Number      int     `json:"number"`
+	MenuID      int     `json:"menu_id"`
+	Title       string  `json:"title"`
+	RestTitle   string  `json:"rest_title"`
+	Composition string  `json:"composition"`
+	Cost        float64 `json:"cost"`
 }
 
 func ConvertOrderToDTO(order *domain.Order) *OrderDTO {
 
 	return &OrderDTO{
+		ID:      order.ID,
 		Number:  order.Number,
 		Email:   order.Email,
 		Address: order.Address,
@@ -53,13 +62,16 @@ func ConvertOrderToDTO(order *domain.Order) *OrderDTO {
 
 }
 
-func ConvertItemToDTOUser(item *domain.Item) *ItemDTOUser {
+func ConvertItemToDTOUser(item *domain.OrderItem) *ItemDTOUserResponse {
 
-	return &ItemDTOUser{
-		Title:     item.Title,
-		RestTitle: item.RestTitle,
-		Time:      item.Time,
-		Cost:      item.Cost,
+	return &ItemDTOUserResponse{
+		ID:          item.ID,
+		Number:      item.Number,
+		MenuID:      item.MenuID,
+		Title:       item.Title,
+		RestTitle:   item.RestTitle,
+		Composition: item.Composition,
+		Cost:        item.Cost,
 	}
 
 }
@@ -78,8 +90,6 @@ func ConvertItemToDTOUser(item *domain.Item) *ItemDTOUser {
 // @Failure 500 {object} domain.ErrorResponse "Произошла ошибка на сервере"
 // @Security Auth
 func (h *OrderHandler) CreateOrder(c *gin.Context) {
-
-	slog.Info("Handler started \"CreateOrder\"")
 
 	ctx := c.Request.Context()
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
@@ -122,7 +132,6 @@ func (h *OrderHandler) CreateOrder(c *gin.Context) {
 		slog.Warn("\"CreateOrder\" took a lot of time")
 	}
 
-	slog.Info("Handler ended \"CreateOrder\" success")
 	c.String(201, "Order created! Number of your order - %s. Use him to add new items.", order.Number)
 
 }
@@ -134,7 +143,7 @@ func (h *OrderHandler) CreateOrder(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Param number path int true "Номер заказа"
-// @Param body body []ItemDTOUser true "Название блюда и ресторана"
+// @Param body body []ItemDTOUserRequest true "Айди меню"
 // @Success 200 "OK"
 // @Failure 400 {object} domain.ErrorResponse "Неправильный номер"
 // @Failure 401 {object} domain.ErrorResponse "Почта не найдена"
@@ -142,8 +151,6 @@ func (h *OrderHandler) CreateOrder(c *gin.Context) {
 // @Failure 500 {object} domain.ErrorResponse "Произошла ошибка на сервере"
 // @Security Auth
 func (h *OrderHandler) AddItemsToOrder(c *gin.Context) {
-
-	slog.Info("Handler started \"AddItemsToOrder\"")
 
 	number_string := c.Param("number")
 	number, err := strconv.Atoi(number_string)
@@ -171,7 +178,7 @@ func (h *OrderHandler) AddItemsToOrder(c *gin.Context) {
 	defer cancel()
 	start := time.Now()
 
-	itemsDTO := []ItemDTOUser{}
+	itemsDTO := []ItemDTOUserRequest{}
 	if err := c.ShouldBindJSON(&itemsDTO); err != nil {
 		slog.Error("\"AddItemsToOrder\"", "err", err.Error())
 		c.JSON(500, domain.ErrorResponse{Error: err.Error()})
@@ -180,7 +187,7 @@ func (h *OrderHandler) AddItemsToOrder(c *gin.Context) {
 
 	for _, dto := range itemsDTO {
 
-		if err := h.Service.AddItemsToOrder(ctx, number, email, dto.Title, dto.RestTitle); err != nil {
+		if err := h.Service.AddItemsToOrder(ctx, number, dto.MenuID, email); err != nil {
 			if errors.Is(err, domain.ErrWithInsert) || errors.Is(err, domain.ErrWithUpdate) {
 				c.JSON(400, domain.ErrorResponse{Error: err.Error()})
 			} else if errors.Is(err, domain.ErrItemNotFound) || errors.Is(err, domain.ErrOrderNotFound) {
@@ -197,7 +204,6 @@ func (h *OrderHandler) AddItemsToOrder(c *gin.Context) {
 		slog.Warn("\"AddItemsToOrder\" took a lot of time")
 	}
 
-	slog.Info("Handler ended \"AddItemsToOrder\" success")
 	c.Status(200)
 
 }
@@ -209,7 +215,7 @@ func (h *OrderHandler) AddItemsToOrder(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Param number path int true "Номер заказа"
-// @Param body body []ItemDTOUser true "Название блюда и ресторана"
+// @Param body body []ItemDTOUserRequest true "Айди меню"
 // @Success 200 "OK"
 // @Failure 400 {object} domain.ErrorResponse "Неправильный номер"
 // @Failure 401 {object} domain.ErrorResponse "Почта не найдена"
@@ -217,8 +223,6 @@ func (h *OrderHandler) AddItemsToOrder(c *gin.Context) {
 // @Failure 500 {object} domain.ErrorResponse "Произошла ошибка на сервере"
 // @Security Auth
 func (h *OrderHandler) DeleteItemsFromOrder(c *gin.Context) {
-
-	slog.Info("Handler started \"DeleteItemsFromOrder\"")
 
 	number_string := c.Param("number")
 	number, err := strconv.Atoi(number_string)
@@ -246,7 +250,7 @@ func (h *OrderHandler) DeleteItemsFromOrder(c *gin.Context) {
 	defer cancel()
 	start := time.Now()
 
-	itemsDTO := []ItemDTOUser{}
+	itemsDTO := []ItemDTOUserRequest{}
 	if err := c.ShouldBindJSON(&itemsDTO); err != nil {
 		slog.Error("Handler \"DeleteItemsFromOrder\" get next error when parsing json", "err", err.Error())
 		c.JSON(500, domain.ErrorResponse{Error: err.Error()})
@@ -255,7 +259,7 @@ func (h *OrderHandler) DeleteItemsFromOrder(c *gin.Context) {
 
 	for _, dto := range itemsDTO {
 
-		if err := h.Service.DeleteItemsFromOrder(ctx, number, email, dto.Title, dto.RestTitle); err != nil {
+		if err := h.Service.DeleteItemsFromOrder(ctx, number, dto.MenuID, email); err != nil {
 			if errors.Is(err, domain.ErrWithUpdate) || errors.Is(err, domain.ErrWithDelete) {
 				c.JSON(400, domain.ErrorResponse{Error: err.Error()})
 			} else if errors.Is(err, domain.ErrItemNotFound) || errors.Is(err, domain.ErrOrderNotFound) {
@@ -272,7 +276,6 @@ func (h *OrderHandler) DeleteItemsFromOrder(c *gin.Context) {
 		slog.Warn("\"DeleteItemsFromOrder\" took a lot of time")
 	}
 
-	slog.Info("Handler ended \"DeleteItemsFromOrder\" success")
 	c.Status(200)
 
 }
@@ -289,8 +292,6 @@ func (h *OrderHandler) DeleteItemsFromOrder(c *gin.Context) {
 // @Failure 500 {object} domain.ErrorResponse "Произошла ошибка на сервере"
 // @Security Auth
 func (h *OrderHandler) CancelOrder(c *gin.Context) {
-
-	slog.Info("Handler started \"CancelOrder\"")
 
 	number_string := c.Param("number")
 	number, err := strconv.Atoi(number_string)
@@ -331,7 +332,6 @@ func (h *OrderHandler) CancelOrder(c *gin.Context) {
 		slog.Warn("\"CancelOrder\" took a lot of time")
 	}
 
-	slog.Info("Handler ended \"CancelOrder\" success")
 	c.Status(200)
 
 }
@@ -349,8 +349,6 @@ func (h *OrderHandler) CancelOrder(c *gin.Context) {
 // @Failure 500 {object} domain.ErrorResponse "Произошла ошибка на сервере"
 // @Security Auth
 func (h *OrderHandler) GetOrder(c *gin.Context) {
-
-	slog.Info("Handler started \"GetOrder\"")
 
 	number_string := c.Param("number")
 	number, err := strconv.Atoi(number_string)
@@ -394,7 +392,6 @@ func (h *OrderHandler) GetOrder(c *gin.Context) {
 		slog.Warn("\"GetOrder\" took a lot of time")
 	}
 
-	slog.Info("Handler ended \"GetOrder\" success")
 	c.JSON(200, dto)
 
 }
@@ -405,14 +402,12 @@ func (h *OrderHandler) GetOrder(c *gin.Context) {
 // @Router /orders/details/{number} [get]
 // @Produce json
 // @Param number path int true "Номер заказа"
-// @Success 200 {array} ItemDTOUser "OK"
+// @Success 200 {array} ItemDTOUserResponse "OK"
 // @Failure 400 {object} domain.ErrorResponse "Неправильный номер"
 // @Failure 401 {object} domain.ErrorResponse "Почта не найдена"
 // @Failure 500 {object} domain.ErrorResponse "Произошла ошибка на сервере"
 // @Security Auth
 func (h *OrderHandler) GetOrderDetails(c *gin.Context) {
-
-	slog.Info("Handler started \"GetOrderDetails\"")
 
 	number_string := c.Param("number")
 	number, err := strconv.Atoi(number_string)
@@ -446,8 +441,8 @@ func (h *OrderHandler) GetOrderDetails(c *gin.Context) {
 		return
 	}
 
-	dtos := []ItemDTOUser{}
-	for _, item := range *items {
+	dtos := []ItemDTOUserResponse{}
+	for _, item := range items {
 
 		dtos = append(dtos, *ConvertItemToDTOUser(&item))
 
@@ -457,7 +452,6 @@ func (h *OrderHandler) GetOrderDetails(c *gin.Context) {
 		slog.Warn("\"GetOrderDetails\" took a lot of time")
 	}
 
-	slog.Info("Handler ended \"GetOrderDetails\" success")
 	c.JSON(200, dtos)
 
 }
@@ -476,8 +470,6 @@ func (h *OrderHandler) GetOrderDetails(c *gin.Context) {
 // @Failure 500 {object} domain.ErrorResponse "Произошла ошибка на сервере"
 // @Security Auth
 func (h *OrderHandler) ConfirmOrder(c *gin.Context) {
-
-	slog.Info("Handler started \"ConfirmOrder\"")
 
 	number_string := c.Param("number")
 	number, err := strconv.Atoi(number_string)
@@ -520,7 +512,6 @@ func (h *OrderHandler) ConfirmOrder(c *gin.Context) {
 		slog.Warn("\"ConfirmOrder\" took a lot of time")
 	}
 
-	slog.Info("Handler ended \"ConfirmOrder\" success")
 	c.Status(200)
 
 }

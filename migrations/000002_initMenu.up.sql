@@ -1,8 +1,8 @@
 CREATE TABLE IF NOT EXISTS menu(
 	id SERIAL PRIMARY KEY,
+	rest_id INT REFERENCES restaurants(id) NOT NULL,
 	title VARCHAR(100) NOT NULL,
-	rest_title VARCHAR(100) NOT NULL,
 	composition VARCHAR(300) NOT NULL,
 	time INT NOT NULL,
 	cost DECIMAL(9,2) NOT NULL
-);
+);	
