@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"log/slog"
 	"strconv"
-	"sync"
 	"time"
 
 	"github.com/redis/go-redis/v9"
@@ -28,7 +27,6 @@ type RestaurantRepository interface {
 }
 
 type RestaurantRepositoryStruct struct {
-	Mtx sync.RWMutex
 	DB  *database.DB
 	RDB *redis.Client
 }
@@ -36,7 +34,6 @@ type RestaurantRepositoryStruct struct {
 func NewRestaurantRepositoryStruct(db *database.DB, rdb *redis.Client) *RestaurantRepositoryStruct {
 
 	return &RestaurantRepositoryStruct{
-		Mtx: sync.RWMutex{},
 		DB:  db,
 		RDB: rdb,
 	}
@@ -54,6 +51,7 @@ type RestModel struct {
 func ConvertModelToRest(model *RestModel) *domain.Restaurant {
 
 	return &domain.Restaurant{
+		ID:          model.ID,
 		Title:       model.Title,
 		Description: model.Description,
 		Address:     model.Address,

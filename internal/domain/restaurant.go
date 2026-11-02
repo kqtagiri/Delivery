@@ -1,6 +1,7 @@
 package domain
 
 type Restaurant struct {
+	ID          int     `json:"id"`
 	Title       string  `json:"title"`
 	Description string  `json:"desc"`
 	Address     string  `json:"address"`

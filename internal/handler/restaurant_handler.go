@@ -26,6 +26,7 @@ func NewRestaurantHandler(service *service.RestaurantService) *RestaurantHandler
 }
 
 type RestDTO struct {
+	ID          int     `json:"id"`
 	Title       string  `json:"title" binding:"required"`
 	Description string  `json:"description"`
 	Address     string  `json:"address" binding:"required"`
@@ -35,6 +36,7 @@ type RestDTO struct {
 func ConvertRestToDTO(rest *domain.Restaurant) *RestDTO {
 
 	return &RestDTO{
+		ID:          rest.ID,
 		Title:       rest.Title,
 		Description: rest.Description,
 		Address:     rest.Address,
@@ -163,7 +165,7 @@ func (h *RestaurantHandler) RestaurantsList(c *gin.Context) {
 // @Router /restaurants/{id}/menu [get]
 // @Produce json
 // @Param id path int true "ID ресторана"
-// @Success 200 {array} ItemDTOAdmin "OK"
+// @Success 200 {array} ItemDTOAdminResponse "OK"
 // @Failure 500 {object} domain.ErrorResponse "Произошла ошибка на сервере"
 func (h *RestaurantHandler) RestaurantMenu(c *gin.Context) {
 

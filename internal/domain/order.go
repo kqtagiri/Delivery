@@ -1,6 +1,7 @@
 package domain
 
 type Order struct {
+	ID      int
 	Number  int
 	Email   string
 	Address string

@@ -6,14 +6,13 @@ import (
 	"delivery/internal/domain"
 	"errors"
 	"log/slog"
-	"sync"
 
 	"github.com/jackc/pgx/v5"
 	"golang.org/x/crypto/bcrypt"
 )
 
 type UserModel struct {
-	Id       int
+	ID       int
 	Name     string
 	Email    string
 	Password string
@@ -25,6 +24,7 @@ type UserModel struct {
 func ConvertModelToUser(model *UserModel) *domain.User {
 
 	return &domain.User{
+		ID:       model.ID,
 		Name:     model.Name,
 		Email:    model.Email,
 		Role:     model.Role,
@@ -36,15 +36,13 @@ func ConvertModelToUser(model *UserModel) *domain.User {
 }
 
 type UserRepositoryStruct struct {
-	Mtx sync.RWMutex
-	DB  *database.DB
+	DB *database.DB
 }
 
 func NewUserRepositoryStruct(db *database.DB) *UserRepositoryStruct {
 
 	return &UserRepositoryStruct{
-		Mtx: sync.RWMutex{},
-		DB:  db,
+		DB: db,
 	}
 
 }
@@ -52,7 +50,7 @@ func NewUserRepositoryStruct(db *database.DB) *UserRepositoryStruct {
 type UserRepository interface {
 	RegisterAccount(ctx context.Context, u *domain.User) error
 	Authorization(ctx context.Context, email, password string) (*domain.Tokens, error)
-	Refresh(ctx context.Context, userId int) (*domain.Tokens, error)
+	Refresh(ctx context.Context, userID int) (*domain.Tokens, error)
 	ReplenishBalance(ctx context.Context, balance float64, email string) error
 	UserInfo(ctx context.Context, email string) (*domain.User, error)
 	AllUsersInfo(ctx context.Context) ([]domain.User, error)
@@ -88,7 +86,7 @@ func (r *UserRepositoryStruct) Authorization(ctx context.Context, email, passwor
 
 	query := `SELECT * FROM users WHERE email = $1;`
 	var dto UserModel
-	if err := r.DB.Conn.QueryRow(ctx, query, email).Scan(&dto.Id, &dto.Name, &dto.Email, &dto.Password, &dto.Role, &dto.Address, &dto.Balance); err != nil {
+	if err := r.DB.Conn.QueryRow(ctx, query, email).Scan(&dto.ID, &dto.Name, &dto.Email, &dto.Password, &dto.Role, &dto.Address, &dto.Balance); err != nil {
 		slog.Error("Repository \"Authorization\" get next error", "err", err.Error())
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, domain.ErrInvalidAuthorization
@@ -101,7 +99,7 @@ func (r *UserRepositoryStruct) Authorization(ctx context.Context, email, passwor
 		return nil, domain.ErrInvalidAuthorization
 	}
 
-	tokens, err := domain.GenerateTokens(dto.Id, dto.Email, dto.Role)
+	tokens, err := domain.GenerateTokens(dto.ID, dto.Email, dto.Role)
 	if err != nil {
 		return nil, err
 	}
@@ -110,12 +108,12 @@ func (r *UserRepositoryStruct) Authorization(ctx context.Context, email, passwor
 
 }
 
-func (r *UserRepositoryStruct) Refresh(ctx context.Context, userId int) (*domain.Tokens, error) {
+func (r *UserRepositoryStruct) Refresh(ctx context.Context, userID int) (*domain.Tokens, error) {
 
-	var id int
+	var ID int
 	var email, role string
-	query := `SELECT id, email, role FROM users WHERE id = $1;`
-	if err := r.DB.Conn.QueryRow(ctx, query, userId).Scan(&id, &email, &role); err != nil {
+	query := `SELECT ID, email, role FROM users WHERE ID = $1;`
+	if err := r.DB.Conn.QueryRow(ctx, query, userID).Scan(&ID, &email, &role); err != nil {
 		slog.Error("Repository \"Refresh\" get next error", "err", err.Error())
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, domain.ErrUserNotFound
@@ -123,7 +121,7 @@ func (r *UserRepositoryStruct) Refresh(ctx context.Context, userId int) (*domain
 		return nil, err
 	}
 
-	tokens, err := domain.GenerateTokens(id, email, role)
+	tokens, err := domain.GenerateTokens(ID, email, role)
 	if err != nil {
 		return nil, err
 	}
@@ -154,7 +152,7 @@ func (r *UserRepositoryStruct) UserInfo(ctx context.Context, email string) (*dom
 
 	query := "SELECT * FROM users WHERE email = $1;"
 	var model UserModel
-	if err := r.DB.Conn.QueryRow(ctx, query, email).Scan(&model.Id, &model.Name, &model.Email, &model.Password, &model.Role, &model.Address, &model.Balance); err != nil {
+	if err := r.DB.Conn.QueryRow(ctx, query, email).Scan(&model.ID, &model.Name, &model.Email, &model.Password, &model.Role, &model.Address, &model.Balance); err != nil {
 		slog.Error("Repository \"UserInfo\" with email %s get next error:%w", email, err)
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, domain.ErrUserNotFound
@@ -182,7 +180,7 @@ func (r *UserRepositoryStruct) AllUsersInfo(ctx context.Context) ([]domain.User,
 	users := []domain.User{}
 	for rows.Next() {
 
-		if err := rows.Scan(&model.Id, &model.Name, &model.Email, &model.Password, &model.Role, &model.Address, &model.Balance); err != nil {
+		if err := rows.Scan(&model.ID, &model.Name, &model.Email, &model.Password, &model.Role, &model.Address, &model.Balance); err != nil {
 			slog.Error("Repository \"AllUsersInfo\" get next error", "err", err.Error())
 			return nil, err
 		}

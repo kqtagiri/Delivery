@@ -12,6 +12,7 @@ import (
 )
 
 type UserDTO struct {
+	ID       int     `json:"id"`
 	Name     string  `json:"name" binding:"required"`
 	Email    string  `json:"email" binding:"required,email"`
 	Password string  `json:"password" binding:"required"`
@@ -23,6 +24,7 @@ type UserDTO struct {
 func ConvertUserToDTO(user *domain.User) *UserDTO {
 
 	return &UserDTO{
+		ID:       user.ID,
 		Name:     user.Name,
 		Email:    user.Email,
 		Password: user.Password,

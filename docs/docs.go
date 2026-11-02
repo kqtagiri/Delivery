@@ -47,14 +47,14 @@ const docTemplate = `{
                         "required": true
                     },
                     {
-                        "description": "Название блюда и ресторана",
+                        "description": "Айди меню",
                         "name": "body",
                         "in": "body",
                         "required": true,
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/handler.ItemDTOUser"
+                                "$ref": "#/definitions/handler.ItemDTOUserRequest"
                             }
                         }
                     }
@@ -287,14 +287,14 @@ const docTemplate = `{
                         "required": true
                     },
                     {
-                        "description": "Название блюда и ресторана",
+                        "description": "Айди меню",
                         "name": "body",
                         "in": "body",
                         "required": true,
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/handler.ItemDTOUser"
+                                "$ref": "#/definitions/handler.ItemDTOUserRequest"
                             }
                         }
                     }
@@ -360,7 +360,7 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/handler.ItemDTOUser"
+                                "$ref": "#/definitions/handler.ItemDTOUserResponse"
                             }
                         }
                     },
@@ -470,55 +470,6 @@ const docTemplate = `{
                         }
                     }
                 }
-            },
-            "post": {
-                "security": [
-                    {
-                        "Auth": []
-                    }
-                ],
-                "description": "Добавление новых блюд в меню",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "rest"
-                ],
-                "summary": "Add new items",
-                "parameters": [
-                    {
-                        "description": "Название блюда, ресторана, состав, время приготовления и цена",
-                        "name": "body",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/handler.ItemDTOAdmin"
-                            }
-                        }
-                    }
-                ],
-                "responses": {
-                    "201": {
-                        "description": "Блюда успешно добавлены"
-                    },
-                    "400": {
-                        "description": "Неправильные входные данные",
-                        "schema": {
-                            "$ref": "#/definitions/domain.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Произошла ошибка на сервере",
-                        "schema": {
-                            "$ref": "#/definitions/domain.ErrorResponse"
-                        }
-                    }
-                }
             }
         },
         "/restaurants/create": {
@@ -583,16 +534,13 @@ const docTemplate = `{
                 "consumes": [
                     "application/json"
                 ],
-                "produces": [
-                    "application/json"
-                ],
                 "tags": [
                     "rest"
                 ],
                 "summary": "Delete items",
                 "parameters": [
                     {
-                        "description": "Названия блюд и ресторанов",
+                        "description": "ID ресторанов и название блюд",
                         "name": "body",
                         "in": "body",
                         "required": true,
@@ -623,7 +571,55 @@ const docTemplate = `{
                 }
             }
         },
-        "/restaurants/{title}": {
+        "/restaurants/{id}": {
+            "post": {
+                "security": [
+                    {
+                        "Auth": []
+                    }
+                ],
+                "description": "Добавление новых блюд в меню",
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "rest"
+                ],
+                "summary": "Add new items",
+                "parameters": [
+                    {
+                        "description": "Название блюда, состав, время приготовления и цена",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/handler.ItemDTOAdminRequest"
+                            }
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Блюда успешно добавлены"
+                    },
+                    "400": {
+                        "description": "Неправильные входные данные",
+                        "schema": {
+                            "$ref": "#/definitions/domain.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Произошла ошибка на сервере",
+                        "schema": {
+                            "$ref": "#/definitions/domain.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/restaurants/{id}/menu": {
             "get": {
                 "description": "Просмотр меню ресторана",
                 "produces": [
@@ -635,9 +631,9 @@ const docTemplate = `{
                 "summary": "Restaurant menu",
                 "parameters": [
                     {
-                        "type": "string",
-                        "description": "Название ресторана",
-                        "name": "title",
+                        "type": "integer",
+                        "description": "ID ресторана",
+                        "name": "id",
                         "in": "path",
                         "required": true
                     }
@@ -648,7 +644,7 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/handler.ItemDTOAdmin"
+                                "$ref": "#/definitions/handler.ItemDTOAdminResponse"
                             }
                         }
                     },
@@ -935,12 +931,11 @@ const docTemplate = `{
                 }
             }
         },
-        "handler.ItemDTOAdmin": {
+        "handler.ItemDTOAdminRequest": {
             "type": "object",
             "required": [
                 "composition",
                 "cost",
-                "rest_title",
                 "time",
                 "title"
             ],
@@ -951,8 +946,28 @@ const docTemplate = `{
                 "cost": {
                     "type": "number"
                 },
-                "rest_title": {
+                "time": {
+                    "type": "integer"
+                },
+                "title": {
                     "type": "string"
+                }
+            }
+        },
+        "handler.ItemDTOAdminResponse": {
+            "type": "object",
+            "properties": {
+                "composition": {
+                    "type": "string"
+                },
+                "cost": {
+                    "type": "number"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "rest_id": {
+                    "type": "integer"
                 },
                 "time": {
                     "type": "integer"
@@ -962,21 +977,37 @@ const docTemplate = `{
                 }
             }
         },
-        "handler.ItemDTOUser": {
+        "handler.ItemDTOUserRequest": {
             "type": "object",
             "required": [
-                "rest_title",
-                "title"
+                "menu_id"
             ],
             "properties": {
+                "menu_id": {
+                    "type": "integer"
+                }
+            }
+        },
+        "handler.ItemDTOUserResponse": {
+            "type": "object",
+            "properties": {
+                "composition": {
+                    "type": "string"
+                },
                 "cost": {
                     "type": "number"
                 },
+                "id": {
+                    "type": "integer"
+                },
+                "menu_id": {
+                    "type": "integer"
+                },
+                "number": {
+                    "type": "integer"
+                },
                 "rest_title": {
                     "type": "string"
-                },
-                "time": {
-                    "type": "integer"
                 },
                 "title": {
                     "type": "string"
@@ -986,12 +1017,12 @@ const docTemplate = `{
         "handler.ItemDeleteDTO": {
             "type": "object",
             "required": [
-                "rest_title",
+                "rest_id",
                 "title"
             ],
             "properties": {
-                "rest_title": {
-                    "type": "string"
+                "rest_id": {
+                    "type": "integer"
                 },
                 "title": {
                     "type": "string"
@@ -1012,6 +1043,9 @@ const docTemplate = `{
                 },
                 "email": {
                     "type": "string"
+                },
+                "id": {
+                    "type": "integer"
                 },
                 "number": {
                     "type": "integer"
@@ -1057,6 +1091,9 @@ const docTemplate = `{
                 "description": {
                     "type": "string"
                 },
+                "id": {
+                    "type": "integer"
+                },
                 "rating": {
                     "type": "number"
                 },
@@ -1098,6 +1135,9 @@ const docTemplate = `{
                 },
                 "email": {
                     "type": "string"
+                },
+                "id": {
+                    "type": "integer"
                 },
                 "name": {
                     "type": "string"

@@ -176,10 +176,12 @@ func main() {
 	}
 
 	go func() {
+
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			slog.Error(err.Error())
 			return
 		}
+
 	}()
 
 	quit := make(chan os.Signal, 1)

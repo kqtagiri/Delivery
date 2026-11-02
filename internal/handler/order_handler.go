@@ -25,6 +25,7 @@ func NewOrderHandler(service *service.OrderService) *OrderHandler {
 }
 
 type OrderDTO struct {
+	ID      int     `json:"id"`
 	Number  int     `json:"number"`
 	Email   string  `json:"email"`
 	Address string  `json:"address" binding:"required"`
@@ -50,6 +51,7 @@ type ItemDTOUserResponse struct {
 func ConvertOrderToDTO(order *domain.Order) *OrderDTO {
 
 	return &OrderDTO{
+		ID:      order.ID,
 		Number:  order.Number,
 		Email:   order.Email,
 		Address: order.Address,

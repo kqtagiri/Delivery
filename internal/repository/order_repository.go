@@ -7,7 +7,6 @@ import (
 	"delivery/internal/domain"
 	"errors"
 	"log/slog"
-	"sync"
 
 	"github.com/jackc/pgx/v5"
 )
@@ -24,21 +23,19 @@ type OrderRepository interface {
 }
 
 type OrderRepositoryStruct struct {
-	Mtx sync.RWMutex
-	DB  *database.DB
+	DB *database.DB
 }
 
 func NewOrderRepositoryStruct(db *database.DB) *OrderRepositoryStruct {
 
 	return &OrderRepositoryStruct{
-		Mtx: sync.RWMutex{},
-		DB:  db,
+		DB: db,
 	}
 
 }
 
 type OrderModel struct {
-	Id      int
+	ID      int
 	Number  int
 	Email   string
 	Address string
@@ -50,6 +47,7 @@ type OrderModel struct {
 func ConvertModelToOrder(model *OrderModel) *domain.Order {
 
 	return &domain.Order{
+		ID:      model.ID,
 		Number:  model.Number,
 		Email:   model.Email,
 		Address: model.Address,
@@ -367,7 +365,7 @@ func (r *OrderRepositoryStruct) GetOrder(ctx context.Context, number int, email 
 
 	query = `SELECT * FROM orders WHERE number = $1;`
 	var model OrderModel
-	if err := r.DB.Conn.QueryRow(ctx, query, number).Scan(&model.Id, &model.Number, &model.Email, &model.Address, &model.Status, &model.Time, &model.Cost); err != nil {
+	if err := r.DB.Conn.QueryRow(ctx, query, number).Scan(&model.ID, &model.Number, &model.Email, &model.Address, &model.Status, &model.Time, &model.Cost); err != nil {
 		slog.Error("Repository \"GetOrder\" get next error", "err", err.Error())
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, domain.ErrOrderNotFound
@@ -511,7 +509,7 @@ func (r *OrderRepositoryStruct) FillUser(ctx context.Context, email string) (*do
 	query := "SELECT * FROM users WHERE email = $1;"
 
 	var model UserModel
-	if err := r.DB.Conn.QueryRow(ctx, query, email).Scan(&model.Id, &model.Name, &model.Email, &model.Address, &model.Balance); err != nil {
+	if err := r.DB.Conn.QueryRow(ctx, query, email).Scan(&model.ID, &model.Name, &model.Email, &model.Address, &model.Balance); err != nil {
 		slog.Error("Repository \"FillUser\" with email %s get next error:", email, err)
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, domain.ErrUserNotFound
