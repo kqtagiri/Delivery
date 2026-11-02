@@ -21,7 +21,7 @@ var (
 
 type RestaurantRepository interface {
 	CreateRestaurant(ctx context.Context, rest *domain.Restaurant) error
-	RestaurantsList(ctx context.Context) (*[]domain.Restaurant, error)
+	RestaurantsList(ctx context.Context) ([]domain.Restaurant, error)
 	RestaurantMenu(ctx context.Context, restID int) ([]domain.Item, error)
 	AddNewItems(ctx context.Context, restID int, item *domain.Item) error
 	DeleteItems(ctx context.Context, restID int, title string) error
@@ -86,9 +86,6 @@ func ConvertModelToItem(model *ItemModel) *domain.Item {
 
 func (r *RestaurantRepositoryStruct) CreateRestaurant(ctx context.Context, rest *domain.Restaurant) error {
 
-	r.Mtx.Lock()
-	defer r.Mtx.Unlock()
-
 	query := `INSERT INTO restaurants (title, description, address, rating) VALUES($1,$2,$3,$4);`
 	result, err := r.DB.Conn.Exec(ctx, query, rest.Title, rest.Description, rest.Address, rest.Rating)
 	if err != nil {
@@ -106,10 +103,7 @@ func (r *RestaurantRepositoryStruct) CreateRestaurant(ctx context.Context, rest 
 
 }
 
-func (r *RestaurantRepositoryStruct) RestaurantsList(ctx context.Context) (*[]domain.Restaurant, error) {
-
-	r.Mtx.RLock()
-	defer r.Mtx.RUnlock()
+func (r *RestaurantRepositoryStruct) RestaurantsList(ctx context.Context) ([]domain.Restaurant, error) {
 
 	data, err := r.RDB.Get(ctx, "restaurants_list").Result()
 	if err != nil && err != redis.Nil {
@@ -120,7 +114,7 @@ func (r *RestaurantRepositoryStruct) RestaurantsList(ctx context.Context) (*[]do
 			slog.Warn("Repository \"RestaurantsList\" get next error when parsing json in struct", "err", err.Error())
 		} else {
 			slog.Info("Repository ended \"RestaurantsList\" by redis")
-			return &rests, nil
+			return rests, nil
 		}
 	}
 
@@ -159,14 +153,11 @@ func (r *RestaurantRepositoryStruct) RestaurantsList(ctx context.Context) (*[]do
 		}
 	}
 
-	return &rests, nil
+	return rests, nil
 
 }
 
 func (r *RestaurantRepositoryStruct) RestaurantMenu(ctx context.Context, restID int) ([]domain.Item, error) {
-
-	r.Mtx.RLock()
-	defer r.Mtx.RUnlock()
 
 	key := fmt.Sprint("restaurant_menu:" + strconv.Itoa(restID))
 	data, err := r.RDB.Get(ctx, key).Result()
@@ -221,9 +212,6 @@ func (r *RestaurantRepositoryStruct) RestaurantMenu(ctx context.Context, restID 
 
 func (r *RestaurantRepositoryStruct) AddNewItems(ctx context.Context, restID int, item *domain.Item) error {
 
-	r.Mtx.Lock()
-	defer r.Mtx.Unlock()
-
 	query := `INSERT INTO menu(rest_id, title, composition, time, cost) VALUES($1,$2,$3,$4,$5);`
 	result, err := r.DB.Conn.Exec(ctx, query, restID, item.Title, item.Composition, item.Time, item.Cost)
 	if err != nil {
@@ -247,9 +235,6 @@ func (r *RestaurantRepositoryStruct) AddNewItems(ctx context.Context, restID int
 }
 
 func (r *RestaurantRepositoryStruct) DeleteItems(ctx context.Context, restID int, title string) error {
-
-	r.Mtx.Lock()
-	defer r.Mtx.Unlock()
 
 	query := `DELETE FROM menu WHERE rest_id = $1 AND title = $2;`
 	result, err := r.DB.Conn.Exec(ctx, query, restID, title)

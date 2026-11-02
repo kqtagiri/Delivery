@@ -8,15 +8,17 @@ import (
 	"errors"
 	"log/slog"
 	"sync"
+
+	"github.com/jackc/pgx/v5"
 )
 
 type OrderRepository interface {
 	CreateOrder(ctx context.Context, order *domain.Order) error
-	AddItemsToOrder(ctx context.Context, number int, email, title, restTitle string) error
-	DeleteItemsFromOrder(ctx context.Context, number int, email, title, restTitle string) error
+	AddItemsToOrder(ctx context.Context, number, menuID int, email string) error
+	DeleteItemsFromOrder(ctx context.Context, number, menuID int, email string) error
 	CancelOrder(ctx context.Context, number int, email string) error
 	GetOrder(ctx context.Context, number int, email string) (*domain.Order, error)
-	GetOrderDetails(ctx context.Context, number int, email string) (*[]domain.Item, error)
+	GetOrderDetails(ctx context.Context, number int, email string) ([]domain.OrderItem, error)
 	ConfirmOrder(ctx context.Context, number int, email string, newBalance float64) error
 	FillUser(ctx context.Context, email string) (*domain.User, error)
 }
@@ -58,12 +60,31 @@ func ConvertModelToOrder(model *OrderModel) *domain.Order {
 
 }
 
+type OrderItemModel struct {
+	ID          int
+	Number      int
+	MenuID      int
+	Title       string
+	RestTitle   string
+	Composition string
+	Cost        float64
+}
+
+func ConvertModelToOrderItem(model *OrderItemModel) *domain.OrderItem {
+
+	return &domain.OrderItem{
+		ID:          model.ID,
+		Number:      model.Number,
+		MenuID:      model.MenuID,
+		Title:       model.Title,
+		RestTitle:   model.RestTitle,
+		Composition: model.Composition,
+		Cost:        model.Cost,
+	}
+
+}
+
 func (r *OrderRepositoryStruct) CreateOrder(ctx context.Context, order *domain.Order) error {
-
-	slog.Info("Repository started \"CreateOrder\"")
-
-	r.Mtx.Lock()
-	defer r.Mtx.Unlock()
 
 	tx, err := r.DB.Conn.Begin(ctx)
 	if err != nil {
@@ -97,23 +118,17 @@ func (r *OrderRepositoryStruct) CreateOrder(ctx context.Context, order *domain.O
 
 	if err := tx.QueryRow(ctx, query, order.Email).Scan(&order.Number); err != nil {
 		slog.Error("Repository \"CreateOrder\" get next error", "err", err)
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, pgx.ErrNoRows) {
 			return domain.ErrOrderNotFound
 		}
 		return err
 	}
 
-	slog.Info("Repository ended \"CreateOrder\" success")
 	return tx.Commit(ctx)
 
 }
 
-func (r *OrderRepositoryStruct) AddItemsToOrder(ctx context.Context, number int, email, title, restTitle string) error {
-
-	slog.Info("Repository started \"AddItemsToOrder\"")
-
-	r.Mtx.Lock()
-	defer r.Mtx.Unlock()
+func (r *OrderRepositoryStruct) AddItemsToOrder(ctx context.Context, number, menuID int, email string) error {
 
 	tx, err := r.DB.Conn.Begin(ctx)
 	if err != nil {
@@ -131,9 +146,9 @@ func (r *OrderRepositoryStruct) AddItemsToOrder(ctx context.Context, number int,
 
 	query := `SELECT email FROM orders WHERE number = $1;`
 	var emailDB string
-	if err := tx.QueryRow(ctx, query, number).Scan(&email); err != nil {
+	if err := tx.QueryRow(ctx, query, number).Scan(&emailDB); err != nil {
 		slog.Error("Repository \"AddItemsToOrder\" get next error", "err", err.Error())
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, pgx.ErrNoRows) {
 			return domain.ErrOrderNotFound
 		}
 		return err
@@ -159,18 +174,28 @@ func (r *OrderRepositoryStruct) AddItemsToOrder(ctx context.Context, number int,
 		return errors.New("status not created")
 	}
 
-	query = `SELECT * FROM menu WHERE title = $1 AND rest_title = $2;`
+	query = `SELECT * FROM menu WHERE id = $1;`
 	var model ItemModel
-	if err := tx.QueryRow(ctx, query, title, restTitle).Scan(&model.Id, &model.Title, &model.RestTitle, &model.Composition, &model.Time, &model.Cost); err != nil {
+	if err := tx.QueryRow(ctx, query, menuID).Scan(&model.ID, &model.RestID, &model.Title, &model.Composition, &model.Time, &model.Cost); err != nil {
 		slog.Error("Repository \"AddItemsToOrder\" get next error", "err", err.Error())
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, pgx.ErrNoRows) {
 			return domain.ErrItemNotFound
 		}
 		return err
 	}
 
+	query = `SELECT rest_title FROM restaurants WHERE id = $1;`
+	restTitle := ""
+	if err := tx.QueryRow(ctx, query, model.RestID).Scan(&restTitle); err != nil {
+		slog.Error("Repository \"AddItemsToOrder\" get next error", "err", err.Error())
+		if errors.Is(err, pgx.ErrNoRows) {
+			return domain.ErrRestaurantNotFound
+		}
+		return err
+	}
+
 	query = `INSERT INTO orders_items(number, title, rest_title, composition, cost, time) VALUES($1,$2,$3,$4,$5,$6);`
-	result, err := tx.Exec(ctx, query, number, model.Title, model.RestTitle, model.Composition, model.Cost, model.Time)
+	result, err := tx.Exec(ctx, query, number, model.ID, model.Title, restTitle, model.Composition, model.Cost)
 	if err != nil {
 		slog.Error("Repository \"AddItemsToOrder\" get next error", "err", err.Error())
 		return err
@@ -195,17 +220,11 @@ func (r *OrderRepositoryStruct) AddItemsToOrder(ctx context.Context, number int,
 		return domain.ErrWithUpdate
 	}
 
-	slog.Info("Repository ended \"AddItemsToOrder\" success")
 	return tx.Commit(ctx)
 
 }
 
-func (r *OrderRepositoryStruct) DeleteItemsFromOrder(ctx context.Context, number int, email, title, restTitle string) error {
-
-	slog.Info("Repository started \"DeleteItemsFromOrder\"")
-
-	r.Mtx.Lock()
-	defer r.Mtx.Unlock()
+func (r *OrderRepositoryStruct) DeleteItemsFromOrder(ctx context.Context, number, menuID int, email string) error {
 
 	tx, err := r.DB.Conn.Begin(ctx)
 	if err != nil {
@@ -223,9 +242,9 @@ func (r *OrderRepositoryStruct) DeleteItemsFromOrder(ctx context.Context, number
 
 	query := `SELECT email FROM orders WHERE number = $1;`
 	var emailDB string
-	if err := tx.QueryRow(ctx, query, number).Scan(&email); err != nil {
+	if err := tx.QueryRow(ctx, query, number).Scan(&emailDB); err != nil {
 		slog.Error("Repository \"DeleteItemsFromOrder\" get next error", "err", err.Error())
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, pgx.ErrNoRows) {
 			return domain.ErrOrderNotFound
 		}
 		return err
@@ -240,7 +259,7 @@ func (r *OrderRepositoryStruct) DeleteItemsFromOrder(ctx context.Context, number
 	status := ""
 	if err := tx.QueryRow(ctx, query, number).Scan(&status); err != nil {
 		slog.Error("Repository \"DeleteItemsFromOrder\" get next error", "err", err.Error())
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, pgx.ErrNoRows) {
 			return domain.ErrOrderNotFound
 		}
 		return err
@@ -251,20 +270,20 @@ func (r *OrderRepositoryStruct) DeleteItemsFromOrder(ctx context.Context, number
 		return errors.New("status not created")
 	}
 
-	query = `SELECT time, cost FROM orders_items WHERE title = $1 AND rest_title = $2 AND number = $3;`
+	query = `SELECT time, cost FROM orders_items WHERE menu_id = $1 AND number = $2;`
 
 	var time int
 	var cost float64
-	if err := tx.QueryRow(ctx, query, title, restTitle, number).Scan(&time, &cost); err != nil {
+	if err := tx.QueryRow(ctx, query, menuID, number).Scan(&time, &cost); err != nil {
 		slog.Error("Repository \"DeleteItemsFromOrder\" get next error", "err", err.Error())
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, pgx.ErrNoRows) {
 			return domain.ErrItemNotFound
 		}
 		return err
 	}
 
-	query = `DELETE FROM orders_items WHERE title = $1 AND rest_title = $2 AND number = $3;`
-	result, err := tx.Exec(ctx, query, title, restTitle, number)
+	query = `DELETE FROM orders_items WHERE menu_id = $1 AND number = $2;`
+	result, err := tx.Exec(ctx, query, menuID, number)
 	if err != nil {
 		slog.Error("Repository \"DeleteItemsFromOrder\" get next error", "err", err.Error())
 		return err
@@ -290,23 +309,17 @@ func (r *OrderRepositoryStruct) DeleteItemsFromOrder(ctx context.Context, number
 		return domain.ErrWithUpdate
 	}
 
-	slog.Info("Repository ended \"DeleteItemsFromOrder\" success")
 	return tx.Commit(ctx)
 
 }
 
 func (r *OrderRepositoryStruct) CancelOrder(ctx context.Context, number int, email string) error {
 
-	slog.Info("Repository started \"CancelOrder\"")
-
-	r.Mtx.Lock()
-	defer r.Mtx.Unlock()
-
 	query := `SELECT email FROM orders WHERE number = $1;`
 	var emailDB string
-	if err := r.DB.Conn.QueryRow(ctx, query, number).Scan(&email); err != nil {
+	if err := r.DB.Conn.QueryRow(ctx, query, number).Scan(&emailDB); err != nil {
 		slog.Error("Repository \"CancelOrder\" get next error", "err", err.Error())
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, pgx.ErrNoRows) {
 			return domain.ErrOrderNotFound
 		}
 		return err
@@ -331,23 +344,17 @@ func (r *OrderRepositoryStruct) CancelOrder(ctx context.Context, number int, ema
 		return domain.ErrWithUpdate
 	}
 
-	slog.Info("Repository ended \"CancelOrder\" success")
 	return nil
 
 }
 
 func (r *OrderRepositoryStruct) GetOrder(ctx context.Context, number int, email string) (*domain.Order, error) {
 
-	slog.Info("Repository started \"GetOrder\"")
-
-	r.Mtx.RLock()
-	defer r.Mtx.RUnlock()
-
 	query := `SELECT email FROM orders WHERE number = $1;`
 	var emailDB string
-	if err := r.DB.Conn.QueryRow(ctx, query, number).Scan(&email); err != nil {
+	if err := r.DB.Conn.QueryRow(ctx, query, number).Scan(&emailDB); err != nil {
 		slog.Error("Repository \"GetOrder\" get next error", "err", err.Error())
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, domain.ErrOrderNotFound
 		}
 		return nil, err
@@ -362,7 +369,7 @@ func (r *OrderRepositoryStruct) GetOrder(ctx context.Context, number int, email 
 	var model OrderModel
 	if err := r.DB.Conn.QueryRow(ctx, query, number).Scan(&model.Id, &model.Number, &model.Email, &model.Address, &model.Status, &model.Time, &model.Cost); err != nil {
 		slog.Error("Repository \"GetOrder\" get next error", "err", err.Error())
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, domain.ErrOrderNotFound
 		}
 		return nil, err
@@ -370,24 +377,18 @@ func (r *OrderRepositoryStruct) GetOrder(ctx context.Context, number int, email 
 
 	order := ConvertModelToOrder(&model)
 
-	slog.Info("Repository ended \"GetOrder\" success")
 	return order, nil
 
 }
 
-func (r *OrderRepositoryStruct) GetOrderDetails(ctx context.Context, number int, email string) (*[]domain.Item, error) {
-
-	slog.Info("Repository started \"GetOrderDetails\"")
-
-	r.Mtx.RLock()
-	defer r.Mtx.RUnlock()
+func (r *OrderRepositoryStruct) GetOrderDetails(ctx context.Context, number int, email string) ([]domain.OrderItem, error) {
 
 	query := `SELECT email FROM orders WHERE number = $1;`
 	var emailDB string
-	if err := r.DB.Conn.QueryRow(ctx, query, number).Scan(&email); err != nil {
+	if err := r.DB.Conn.QueryRow(ctx, query, number).Scan(&emailDB); err != nil {
 		slog.Error("Repository \"GetOrderDetails\" get next error", "err", err.Error())
 
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, domain.ErrOrderNotFound
 		}
 		return nil, err
@@ -406,17 +407,16 @@ func (r *OrderRepositoryStruct) GetOrderDetails(ctx context.Context, number int,
 	}
 	defer rows.Close()
 
-	var model ItemModel
-	items := []domain.Item{}
+	var model OrderItemModel
+	items := []domain.OrderItem{}
 	for rows.Next() {
 
-		var number int
-		if err := rows.Scan(&model.Id, &number, &model.Title, &model.RestTitle, &model.Composition, &model.Time, &model.Cost); err != nil {
+		if err := rows.Scan(&model.ID, &model.Number, &model.MenuID, &model.Title, &model.RestTitle, &model.Composition, &model.Cost); err != nil {
 			slog.Error("Repository \"GetOrderDetails\" get next error", "err", err.Error())
 			return nil, err
 		}
 
-		items = append(items, *ConvertModelToItem(&model))
+		items = append(items, *ConvertModelToOrderItem(&model))
 
 	}
 
@@ -425,17 +425,11 @@ func (r *OrderRepositoryStruct) GetOrderDetails(ctx context.Context, number int,
 		return nil, err
 	}
 
-	slog.Info("Repository ended \"GetOrderDetails\" success")
-	return &items, nil
+	return items, nil
 
 }
 
 func (r *OrderRepositoryStruct) ConfirmOrder(ctx context.Context, number int, email string, newBalance float64) error {
-
-	slog.Info("Repository started \"ConfirmOrder\"")
-
-	r.Mtx.Lock()
-	defer r.Mtx.Unlock()
 
 	tx, err := r.DB.Conn.Begin(ctx)
 	if err != nil {
@@ -453,9 +447,9 @@ func (r *OrderRepositoryStruct) ConfirmOrder(ctx context.Context, number int, em
 
 	query := `SELECT email FROM orders WHERE number = $1;`
 	var emailDB string
-	if err := tx.QueryRow(ctx, query, number).Scan(&email); err != nil {
+	if err := tx.QueryRow(ctx, query, number).Scan(&emailDB); err != nil {
 		slog.Error("Repository \"ConfirmOrder\" get next error", "err", err.Error())
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, pgx.ErrNoRows) {
 			return domain.ErrOrderNotFound
 		}
 		return err
@@ -470,7 +464,7 @@ func (r *OrderRepositoryStruct) ConfirmOrder(ctx context.Context, number int, em
 	status := ""
 	if err := tx.QueryRow(ctx, query, number).Scan(&status); err != nil {
 		slog.Error("Repository \"ConfirmOrder\" get next error", "err", err.Error())
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, pgx.ErrNoRows) {
 			return domain.ErrOrderNotFound
 		}
 		return err
@@ -508,7 +502,6 @@ func (r *OrderRepositoryStruct) ConfirmOrder(ctx context.Context, number int, em
 		return domain.ErrWithUpdate
 	}
 
-	slog.Info("Repository ended \"ConfirmOrder\" success")
 	return tx.Commit(ctx)
 
 }
@@ -517,13 +510,10 @@ func (r *OrderRepositoryStruct) FillUser(ctx context.Context, email string) (*do
 
 	query := "SELECT * FROM users WHERE email = $1;"
 
-	r.Mtx.RLock()
-	defer r.Mtx.RUnlock()
-
 	var model UserModel
 	if err := r.DB.Conn.QueryRow(ctx, query, email).Scan(&model.Id, &model.Name, &model.Email, &model.Address, &model.Balance); err != nil {
 		slog.Error("Repository \"FillUser\" with email %s get next error:", email, err)
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, domain.ErrUserNotFound
 		}
 		return nil, err

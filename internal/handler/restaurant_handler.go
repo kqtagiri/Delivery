@@ -147,7 +147,7 @@ func (h *RestaurantHandler) RestaurantsList(c *gin.Context) {
 	}
 
 	dtos := []RestDTO{}
-	for _, rest := range *rests {
+	for _, rest := range rests {
 
 		dtos = append(dtos, *ConvertRestToDTO(&rest))
 

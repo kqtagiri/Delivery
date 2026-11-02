@@ -55,16 +55,11 @@ type UserRepository interface {
 	Refresh(ctx context.Context, userId int) (*domain.Tokens, error)
 	ReplenishBalance(ctx context.Context, balance float64, email string) error
 	UserInfo(ctx context.Context, email string) (*domain.User, error)
-	AllUsersInfo(ctx context.Context) (*[]domain.User, error)
+	AllUsersInfo(ctx context.Context) ([]domain.User, error)
 	//UserHistoryInfo(ctx *context.Context, email string) error
 }
 
 func (r *UserRepositoryStruct) RegisterAccount(ctx context.Context, u *domain.User) error {
-
-	slog.Info("Repository started \"RegisterAccount\"")
-
-	r.Mtx.Lock()
-	defer r.Mtx.Unlock()
 
 	hash, err := bcrypt.GenerateFromPassword([]byte(u.Password), bcrypt.DefaultCost)
 	if err != nil {
@@ -85,14 +80,11 @@ func (r *UserRepositoryStruct) RegisterAccount(ctx context.Context, u *domain.Us
 		return domain.ErrWithInsert
 	}
 
-	slog.Info("Repository ended \"RegisterAccount\" success")
 	return nil
 
 }
 
 func (r *UserRepositoryStruct) Authorization(ctx context.Context, email, password string) (*domain.Tokens, error) {
-
-	slog.Info("Repository started \"Authorization\"")
 
 	query := `SELECT * FROM users WHERE email = $1;`
 	var dto UserModel
@@ -114,14 +106,12 @@ func (r *UserRepositoryStruct) Authorization(ctx context.Context, email, passwor
 		return nil, err
 	}
 
-	slog.Info("Repository ended \"Authorization\" success")
 	return tokens, nil
 
 }
 
 func (r *UserRepositoryStruct) Refresh(ctx context.Context, userId int) (*domain.Tokens, error) {
 
-	slog.Info("Repository started \"Refresh\"")
 	var id int
 	var email, role string
 	query := `SELECT id, email, role FROM users WHERE id = $1;`
@@ -138,17 +128,11 @@ func (r *UserRepositoryStruct) Refresh(ctx context.Context, userId int) (*domain
 		return nil, err
 	}
 
-	slog.Info("Repository ended \"Refresh\" success")
 	return tokens, nil
 
 }
 
 func (r *UserRepositoryStruct) ReplenishBalance(ctx context.Context, balance float64, email string) error {
-
-	slog.Info("Repository started \"ReplenishBalance\"")
-
-	r.Mtx.Lock()
-	defer r.Mtx.Unlock()
 
 	query := `UPDATE users SET balance = $1 WHERE email = $2;`
 	result, err := r.DB.Conn.Exec(ctx, query, balance, email)
@@ -162,17 +146,11 @@ func (r *UserRepositoryStruct) ReplenishBalance(ctx context.Context, balance flo
 		return domain.ErrWithUpdate
 	}
 
-	slog.Info("Repository ended \"ReplenishBalance\" success")
 	return nil
 
 }
 
 func (r *UserRepositoryStruct) UserInfo(ctx context.Context, email string) (*domain.User, error) {
-
-	slog.Info("Repository started \"UserInfo\"")
-
-	r.Mtx.RLock()
-	defer r.Mtx.RUnlock()
 
 	query := "SELECT * FROM users WHERE email = $1;"
 	var model UserModel
@@ -186,17 +164,11 @@ func (r *UserRepositoryStruct) UserInfo(ctx context.Context, email string) (*dom
 
 	user := ConvertModelToUser(&model)
 
-	slog.Info("Repository ended \"UserInfo\" success")
 	return user, nil
 
 }
 
-func (r *UserRepositoryStruct) AllUsersInfo(ctx context.Context) (*[]domain.User, error) {
-
-	slog.Info("Repository started \"AllUsersInfo\"")
-
-	r.Mtx.RLock()
-	defer r.Mtx.RUnlock()
+func (r *UserRepositoryStruct) AllUsersInfo(ctx context.Context) ([]domain.User, error) {
 
 	query := `SELECT * FROM users;`
 	rows, err := r.DB.Conn.Query(ctx, query)
@@ -224,15 +196,6 @@ func (r *UserRepositoryStruct) AllUsersInfo(ctx context.Context) (*[]domain.User
 		return nil, err
 	}
 
-	slog.Info("Repository ended \"AllUsersInfo\" success")
-	return &users, nil
+	return users, nil
 
 }
-
-/*func (r *UserRepositoryStruct) UserHistoryInfo() error {
-
-	slog.Info("Repository start register")
-
-	return nil
-
-}*/

@@ -35,7 +35,7 @@ func (s *RestaurantService) CreateRestaurant(ctx context.Context, title, desc, a
 
 }
 
-func (s *RestaurantService) RestaurantsList(ctx context.Context) (*[]domain.Restaurant, error) {
+func (s *RestaurantService) RestaurantsList(ctx context.Context) ([]domain.Restaurant, error) {
 
 	return s.Repo.RestaurantsList(ctx)
 
